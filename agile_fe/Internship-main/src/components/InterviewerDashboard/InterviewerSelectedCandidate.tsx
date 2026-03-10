@@ -89,7 +89,7 @@ const InterviewerSelectedCandidate: React.FC = () => {
     }
 
     try {
-      const res = await api.get('/interviewer/passed-candidates/', { headers });
+      const res = await api.get('/interviewer/post-interview-decisions/', { headers });
       if (Array.isArray(res.data)) {
         setCandidates(res.data);
       } else {

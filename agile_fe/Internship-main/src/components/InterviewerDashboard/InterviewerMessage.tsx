@@ -4,16 +4,17 @@ import {
   Search,
   Send,
   Paperclip,
-  User,
-  FileText,
-  Clock,
-  CheckCircle,
-  XCircle,
   Star,
-  Filter,
-  ChevronDown,
+  ExternalLink,
 } from 'lucide-react';
 import InterviewerDashboardSkeleton from '../../components/skeleton/InterviewerDashboardSkeleton';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+
+const baseApi = import.meta.env.VITE_BASE_API;
+const api = axios.create({
+  baseURL: baseApi,
+});
 
 // ─── Types ────────────────────────────────────────────────
 interface Message {
@@ -40,81 +41,127 @@ interface Conversation {
   messages: Message[];
 }
 
-// ─── Mock Data ─────────────────────────────────────────────
-const MOCK_CONVERSATIONS: Conversation[] = [
-  {
-    id: 'conv1',
-    candidateName: 'Nirojan Selvan',
-    candidateId: 'cand101',
-    role: 'Frontend Developer Intern',
-    lastMessage: 'Thank you! I will join the call at 3 PM.',
-    lastMessageTime: '10:22 AM',
-    unreadCount: 2,
-    starred: true,
-    status: 'interview',
-    applicationId: 'app_001',
-    messages: [
-      { id: 'm1', sender: 'recruiter', content: 'Hi Nirojan, are you available for an interview tomorrow at 3 PM?', timestamp: 'Yesterday 4:18 PM', read: true },
-      { id: 'm2', sender: 'candidate', content: 'Yes, that works for me!', timestamp: 'Yesterday 4:25 PM', read: true },
-      { id: 'm3', sender: 'recruiter', content: 'Great! Here’s the Zoom link: …', timestamp: 'Yesterday 4:30 PM', read: true },
-      { id: 'm4', sender: 'candidate', content: 'Thank you! I will join the call at 3 PM.', timestamp: '10:22 AM', read: false },
-      { id: 'm5', sender: 'candidate', content: 'Should I prepare anything specific?', timestamp: '10:23 AM', read: false },
-    ],
-  },
-  {
-    id: 'conv2',
-    candidateName: 'Kavindi Sharma',
-    candidateId: 'cand102',
-    role: 'Python Backend Intern',
-    lastMessage: 'Assignment submitted!',
-    lastMessageTime: 'Yesterday',
-    unreadCount: 0,
-    starred: false,
-    status: 'pending',
-    applicationId: 'app_002',
-    messages: [],
-  },
-  // ... more mock entries
-];
-
 // ─── Component ─────────────────────────────────────────────
 const InterviewerMessage: React.FC = () => {
-  const [conversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
-  const [selectedConv, setSelectedConv] = useState<Conversation | null>(MOCK_CONVERSATIONS[0] || null);
+  const navigate = useNavigate();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive / conversation changes
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      setError('Please log in to access this page.');
+      navigate('/login');
+      return null;
+    }
+    return { Authorization: `Token ${token}` };
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const headers = getAuthHeaders();
+    if (!headers) {
+      setIsLoadingConversations(false);
+      return;
+    }
+    setError(null);
+    api.get<Conversation[]>('/messages/interviewer-conversations/', { headers })
+      .then((res) => {
+        if (!cancelled && Array.isArray(res.data)) {
+          setConversations(res.data);
+          if (res.data.length > 0) setSelectedConv(res.data[0]);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err.response?.status === 401) {
+          localStorage.removeItem('access_token');
+          navigate('/login');
+          setError('Session expired. Please log in again.');
+        } else setError('Failed to load conversations.');
+      })
+      .finally(() => { if (!cancelled) setIsLoadingConversations(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedConv?.applicationId) {
+      setMessages([]);
+      return;
+    }
+    let cancelled = false;
+    const headers = getAuthHeaders();
+    if (!headers) return;
+    setIsLoadingMessages(true);
+    api.get<Message[]>(`/messages/conversations/${selectedConv.applicationId}/messages/`, { headers })
+      .then((res) => {
+        if (!cancelled && Array.isArray(res.data)) setMessages(res.data);
+      })
+      .catch(() => { if (!cancelled) setMessages([]); })
+      .finally(() => { if (!cancelled) setIsLoadingMessages(false); });
+    return () => { cancelled = true; };
+  }, [selectedConv?.applicationId]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [selectedConv?.messages]);
+  }, [messages]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim() || !selectedConv) return;
+    const content = messageInput.trim();
+    if ((!content && !selectedFile) || !selectedConv || sending) return;
+    const headers = getAuthHeaders();
+    if (!headers) return;
 
-    const newMsg: Message = {
-      id: `msg-${Date.now()}`,
-      sender: 'recruiter',
-      content: messageInput.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      read: true,
-    };
+    const formData = new FormData();
+    formData.append('content', content);
+    if (selectedFile) formData.append('file', selectedFile);
 
-    // In real app → send via websocket / API, then update state
-    setSelectedConv((prev) =>
-      prev
-        ? {
-            ...prev,
-            messages: [...prev.messages, newMsg],
-            lastMessage: newMsg.content,
-            lastMessageTime: newMsg.timestamp,
-          }
-        : null
-    );
+    setSending(true);
+    api
+      .post<Message>(
+        `/messages/conversations/${selectedConv.applicationId}/send/`,
+        formData,
+        { headers: { ...headers, 'Content-Type': 'multipart/form-data' } },
+      )
+      .then((res) => {
+        setMessages((prev) => [...prev, res.data]);
+        const lastText = res.data.content || (res.data.attachment ? `Attachment: ${res.data.attachment.name}` : '');
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.applicationId === selectedConv.applicationId
+              ? { ...c, lastMessage: lastText, lastMessageTime: res.data.timestamp }
+              : c,
+          ),
+        );
+        setSelectedConv((prev) =>
+          prev && prev.applicationId === selectedConv.applicationId
+            ? { ...prev, lastMessage: lastText, lastMessageTime: res.data.timestamp }
+            : prev,
+        );
+        setMessageInput('');
+        setSelectedFile(null);
+      })
+      .catch(() => setError('Failed to send message.'))
+      .finally(() => setSending(false));
+  };
 
-    setMessageInput('');
+  const handleFileButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedFile(e.target.files?.[0] ?? null);
   };
 
   const filteredConversations = conversations.filter((conv) =>
@@ -126,6 +173,11 @@ const InterviewerMessage: React.FC = () => {
   return (
     <InterviewerDashboardSkeleton>
       <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-50">
+        {error && (
+          <div className="bg-red-50 border-b border-red-200 text-red-700 px-4 py-2 text-sm">
+            {error}
+          </div>
+        )}
         {/* Header */}
         <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
           <h1 className="text-xl font-semibold text-gray-900">Messages</h1>
@@ -146,8 +198,12 @@ const InterviewerMessage: React.FC = () => {
           {/* Left: Conversation List */}
           <div className="w-full md:w-80 lg:w-96 border-r border-gray-200 bg-white overflow-y-auto">
             <div className="divide-y divide-gray-100">
-              {filteredConversations.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">No conversations found</div>
+              {isLoadingConversations ? (
+                <div className="p-8 text-center text-gray-500">Loading...</div>
+              ) : filteredConversations.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  No conversations yet. Only candidates marked as Attended and Selected in Post-Interview Decisions appear here.
+                </div>
               ) : (
                 filteredConversations.map((conv) => (
                   <div
@@ -211,7 +267,7 @@ const InterviewerMessage: React.FC = () => {
 
                 {/* Messages */}
                 <div className="flex-1 p-6 overflow-y-auto space-y-5">
-                  {selectedConv.messages.map((msg) => (
+                  {messages.map((msg) => (
                     <div
                       key={msg.id}
                       className={`flex ${msg.sender === 'recruiter' ? 'justify-end' : 'justify-start'}`}
@@ -223,7 +279,22 @@ const InterviewerMessage: React.FC = () => {
                             : 'bg-gray-200 text-gray-900 rounded-bl-none'
                         }`}
                       >
-                        <p>{msg.content}</p>
+                        {msg.content && <p>{msg.content}</p>}
+                        {msg.attachment && (
+                          <a
+                            href={msg.attachment.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm ${
+                              msg.sender === 'recruiter'
+                                ? 'border-blue-400/50 bg-white/10 text-white'
+                                : 'border-gray-300 bg-gray-50 text-gray-800'
+                            }`}
+                          >
+                            <ExternalLink size={14} />
+                            {msg.attachment.name || 'Download file'}
+                          </a>
+                        )}
                         <p className={`text-xs mt-1 opacity-70 ${msg.sender === 'recruiter' ? 'text-blue-100' : 'text-gray-500'}`}>
                           {msg.timestamp}
                         </p>
@@ -240,19 +311,31 @@ const InterviewerMessage: React.FC = () => {
                       type="button"
                       className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
                       title="Attach file"
+                      onClick={handleFileButtonClick}
                     >
                       <Paperclip size={20} />
                     </button>
                     <input
-                      type="text"
-                      value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
-                      placeholder="Type your message..."
-                      className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      onChange={handleFileChange}
                     />
+                    <div className="flex-1 flex flex-col gap-1">
+                      <input
+                        type="text"
+                        value={messageInput}
+                        onChange={(e) => setMessageInput(e.target.value)}
+                        placeholder="Type your message..."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                      />
+                      {selectedFile && (
+                        <span className="text-xs text-gray-500 px-2">Attached: {selectedFile.name}</span>
+                      )}
+                    </div>
                     <button
                       type="submit"
-                      disabled={!messageInput.trim()}
+                      disabled={(!messageInput.trim() && !selectedFile) || sending}
                       className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Send size={20} />
