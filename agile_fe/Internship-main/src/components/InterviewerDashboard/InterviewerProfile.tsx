@@ -121,7 +121,7 @@ const InterviewerProfile: React.FC = () => {
         <div className="max-w-4xl mx-auto">
           <div className="bg-white shadow rounded-xl overflow-hidden">
             {/* Header */}
-            <div className="px-6 py-5 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+            <div className="px-6 py-5 bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 shadow-[0_10px_30px_rgba(2,6,23,0.35)] text-white">
               <h1 className="text-2xl font-bold">Interviewer Profile</h1>
               <p className="mt-1 text-blue-100">Update your personal information</p>
             </div>

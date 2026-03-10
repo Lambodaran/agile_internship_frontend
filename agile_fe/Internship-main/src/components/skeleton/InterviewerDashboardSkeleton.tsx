@@ -105,7 +105,7 @@ const InterviewerDashboardSkeleton = ({ children }: InterviewerDashboardSkeleton
         title={(!isSidebarOpen && !isMobile) ? "Dashboard" : ""}
         className={`cursor-pointer px-4 py-3 rounded-lg flex items-center transition-colors duration-200 ${
           isActive("/interviewer-dashboard")
-            ? "bg-blue-500 text-white shadow-md"
+            ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-[0_10px_30px_rgba(2,6,23,0.35)]"
             : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
         }`}
       >
@@ -119,7 +119,7 @@ const InterviewerDashboardSkeleton = ({ children }: InterviewerDashboardSkeleton
         title={(!isSidebarOpen && !isMobile) ? "Interview Calendar" : ""}
         className={`cursor-pointer px-4 py-3 mt-2 rounded-lg flex items-center transition-colors duration-200 ${
           isActive("/interviewer-calendar")
-            ? "bg-blue-500 text-white shadow-md"
+            ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-[0_10px_30px_rgba(2,6,23,0.35)]"
             : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
         }`}
       >
@@ -158,7 +158,7 @@ const InterviewerDashboardSkeleton = ({ children }: InterviewerDashboardSkeleton
                 onClick={() => handleNavigation(path)}
                 className={`cursor-pointer px-4 py-2 text-sm rounded-lg flex items-center transition-colors duration-200 ${
                   isActive(path)
-                    ? "bg-blue-500 text-white shadow-md"
+                    ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-[0_10px_30px_rgba(2,6,23,0.35)]"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
                 }`}
               >
@@ -202,7 +202,7 @@ const InterviewerDashboardSkeleton = ({ children }: InterviewerDashboardSkeleton
                 onClick={() => handleNavigation(path)}
                 className={`cursor-pointer px-4 py-2 text-sm rounded-lg flex items-center transition-colors duration-200 ${
                   isActive(path)
-                    ? "bg-blue-500 text-white shadow-md"
+                    ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-[0_10px_30px_rgba(2,6,23,0.35)]"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
                 }`}
               >
@@ -220,7 +220,7 @@ const InterviewerDashboardSkeleton = ({ children }: InterviewerDashboardSkeleton
         title={(!isSidebarOpen && !isMobile) ? "Face-to-Face" : ""}
         className={`cursor-pointer px-4 py-3 mt-2 rounded-lg flex items-center transition-colors duration-200 ${
           isActive("/interviewer-f2f")
-            ? "bg-blue-500 text-white shadow-md"
+            ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-[0_10px_30px_rgba(2,6,23,0.35)]"
             : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
         }`}
       >
@@ -234,7 +234,7 @@ const InterviewerDashboardSkeleton = ({ children }: InterviewerDashboardSkeleton
         title={(!isSidebarOpen && !isMobile) ? "Selected-Candidate" : ""}
         className={`cursor-pointer px-4 py-3 mt-2 rounded-lg flex items-center transition-colors duration-200 ${
           isActive("/interviewer-selected-candidate")
-            ? "bg-blue-500 text-white shadow-md"
+            ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-[0_10px_30px_rgba(2,6,23,0.35)]"
             : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
         }`}
       >
@@ -244,18 +244,18 @@ const InterviewerDashboardSkeleton = ({ children }: InterviewerDashboardSkeleton
 
 
        {/* Interviewer profile */}
-      <div
+      {/* <div
         onClick={() => handleNavigation("/interviewer-profile")}
         title={(!isSidebarOpen && !isMobile) ? "Interviewer-Profile" : ""}
         className={`cursor-pointer px-4 py-3 mt-2 rounded-lg flex items-center transition-colors duration-200 ${
           isActive("/interviewer-profile")
-            ? "bg-blue-500 text-white shadow-md"
+            ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-[0_10px_30px_rgba(2,6,23,0.35)]"
             : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
         }`}
       >
         <User className="w-5 h-5 mr-3 flex-shrink-0" />
         {(isSidebarOpen || isMobile) && <span className="font-medium">Interviewer Profile</span>}
-      </div>
+      </div> */}
 
       {/* Messages */}
       <div
@@ -263,7 +263,7 @@ const InterviewerDashboardSkeleton = ({ children }: InterviewerDashboardSkeleton
         title={(!isSidebarOpen && !isMobile) ? "Messages" : ""}
         className={`cursor-pointer px-4 py-3 mt-2 rounded-lg flex items-center transition-colors duration-200 ${
           isActive("/interviewer-messages")
-            ? "bg-blue-500 text-white shadow-md"
+            ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-[0_10px_30px_rgba(2,6,23,0.35)]"
             : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
         }`}
       >
@@ -277,7 +277,7 @@ const InterviewerDashboardSkeleton = ({ children }: InterviewerDashboardSkeleton
         title={(!isSidebarOpen && !isMobile) ? "Analytics" : ""}
         className={`cursor-pointer px-4 py-3 mt-2 rounded-lg flex items-center transition-colors duration-200 ${
           isActive("/interviewer-analytics")
-            ? "bg-blue-500 text-white shadow-md"
+            ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-[0_10px_30px_rgba(2,6,23,0.35)]"
             : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
         }`}
       >
@@ -291,7 +291,7 @@ const InterviewerDashboardSkeleton = ({ children }: InterviewerDashboardSkeleton
         title={(!isSidebarOpen && !isMobile) ? "Talent Pool" : ""}
         className={`cursor-pointer px-4 py-3 mt-2 rounded-lg flex items-center transition-colors duration-200 ${
           isActive("/interviewer-talent-pool")
-            ? "bg-blue-500 text-white shadow-md"
+            ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-[0_10px_30px_rgba(2,6,23,0.35)]"
             : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
         }`}
       >
@@ -305,7 +305,7 @@ const InterviewerDashboardSkeleton = ({ children }: InterviewerDashboardSkeleton
         title={(!isSidebarOpen && !isMobile) ? "Candidate Activity" : ""}
         className={`cursor-pointer px-4 py-3 mt-2 rounded-lg flex items-center transition-colors duration-200 ${
           isActive("/candidate-activity-log")
-            ? "bg-blue-500 text-white shadow-md"
+            ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-[0_10px_30px_rgba(2,6,23,0.35)]"
             : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
         }`}
       >
