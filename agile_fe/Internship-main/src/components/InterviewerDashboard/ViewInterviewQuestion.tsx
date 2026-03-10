@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Edit,
   Trash,
   Eye,
-  FileText,
   Clock,
-  BarChart3,
   CheckCircle,
   Save,
   X,
@@ -16,14 +14,16 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronRight,
-  Hash,
   Trash2,
   Plus,
-  Download
-} from 'lucide-react';
-import InterviewerDashboardSkeleton from '../skeleton/InterviewerDashboardSkeleton';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+  Download,
+  Sparkles,
+  LayoutList,
+  FolderOpen,
+} from "lucide-react";
+import InterviewerDashboardSkeleton from "../skeleton/InterviewerDashboardSkeleton";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 const baseApi = import.meta.env.VITE_BASE_API;
 
@@ -50,24 +50,29 @@ interface Quiz {
 
 const ViewInterviewQuestion: React.FC = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
-  const [expandedQuizIds, setExpandedQuizIds] = useState<Set<number>>(new Set());
+  const [expandedQuizIds, setExpandedQuizIds] = useState<Set<number>>(
+    new Set()
+  );
   const [isDownloading, setIsDownloading] = useState<Set<number>>(new Set());
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
   const navigate = useNavigate();
 
   const api = axios.create({
     baseURL: baseApi,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem("access_token");
     if (!token) {
-      setError('Please log in to access this page.');
-      navigate('/login');
+      setError("Please log in to access this page.");
+      navigate("/login");
       return null;
     }
     return { Authorization: `Token ${token}` };
@@ -82,20 +87,20 @@ const ViewInterviewQuestion: React.FC = () => {
       if (!headers) return;
 
       try {
-        const response = await api.get('/quiz/my-quiz/', { headers });
+        const response = await api.get("/quiz/my-quiz/", { headers });
         if (Array.isArray(response.data)) {
           setQuizzes(response.data);
         } else {
-          setError('Unexpected API response format.');
+          setError("Unexpected API response format.");
         }
       } catch (err: any) {
-        console.error('API Error:', err.response || err);
+        console.error("API Error:", err.response || err);
         if (err.response?.status === 401) {
-          setError('Session expired. Please log in again.');
-          localStorage.removeItem('access_token');
-          navigate('/login');
+          setError("Session expired. Please log in again.");
+          localStorage.removeItem("access_token");
+          navigate("/login");
         } else {
-          setError('Failed to load quizzes. Please try again later.');
+          setError("Failed to load quizzes. Please try again later.");
         }
       } finally {
         setIsLoading(false);
@@ -120,64 +125,61 @@ const ViewInterviewQuestion: React.FC = () => {
   };
 
   const handleDownloadPDF = async (quiz: Quiz) => {
-    setIsDownloading(prev => new Set(prev).add(quiz.id));
-    
+    setIsDownloading((prev) => new Set(prev).add(quiz.id));
+
     try {
       const headers = getAuthHeaders();
       if (!headers) return;
 
-      // Call your backend API to get the PDF
-      const response = await api.get(`/quiz/${quiz.id}/download-pdf/`, { 
+      const response = await api.get(`/quiz/${quiz.id}/download-pdf/`, {
         headers,
-        responseType: 'blob' // Important: This tells axios to expect binary data
+        responseType: "blob",
       });
-      
-      // Create blob URL from the response
-      const blob = new Blob([response.data], { type: 'application/pdf' });
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
-      
-      // Create temporary link and trigger download
-      const link = document.createElement('a');
+
+      const link = document.createElement("a");
       link.href = url;
-      
-      // Get filename from response headers or create a default one
-      const contentDisposition = response.headers['content-disposition'];
-      let filename = `${quiz.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_quiz.pdf`;
-      
+
+      const contentDisposition = response.headers["content-disposition"];
+      let filename = `${quiz.title
+        .replace(/[^a-z0-9]/gi, "_")
+        .toLowerCase()}_quiz.pdf`;
+
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="(.+)"/);
         if (filenameMatch) {
           filename = filenameMatch[1];
         }
       }
-      
+
       link.download = filename;
       document.body.appendChild(link);
       link.click();
-      
-      // Cleanup
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
-      // Success message - you can replace alert with a toast notification
-      alert('Quiz PDF downloaded successfully!');
-      
+
+      setSuccessMessage("Quiz PDF downloaded successfully!");
+      setShowSuccessModal(true);
+      setTimeout(() => setShowSuccessModal(false), 1800);
     } catch (error: any) {
-      console.error('Download error:', error);
-      
-      // Handle different error scenarios
+      console.error("Download error:", error);
+
       if (error.response?.status === 401) {
-        setError('Session expired. Please log in again.');
-        localStorage.removeItem('access_token');
-        navigate('/login');
+        setError("Session expired. Please log in again.");
+        localStorage.removeItem("access_token");
+        navigate("/login");
       } else if (error.response?.status === 404) {
-        alert('Quiz not found or you don\'t have permission to download it.');
+        setError("Quiz not found or you don't have permission to download it.");
       } else {
-        const errorMessage = error.response?.data?.error || 'Failed to download quiz. Please try again.';
-        alert(errorMessage);
+        const errorMessage =
+          error.response?.data?.error ||
+          "Failed to download quiz. Please try again.";
+        setError(errorMessage);
       }
     } finally {
-      setIsDownloading(prev => {
+      setIsDownloading((prev) => {
         const newSet = new Set(prev);
         newSet.delete(quiz.id);
         return newSet;
@@ -190,17 +192,18 @@ const ViewInterviewQuestion: React.FC = () => {
     const tempId = -(Date.now() + Math.random());
     const newQuestion: Question = {
       id: tempId,
-      text: '',
+      text: "",
       options: [
-        { id: tempId - 1, text: '', is_correct: false },
-        { id: tempId - 2, text: '', is_correct: false },
-        { id: tempId - 3, text: '', is_correct: false },
-        { id: tempId - 4, text: '', is_correct: false }
-      ]
+        { id: tempId - 1, text: "", is_correct: false },
+        { id: tempId - 2, text: "", is_correct: false },
+        { id: tempId - 3, text: "", is_correct: false },
+        { id: tempId - 4, text: "", is_correct: false },
+      ],
     };
+
     setEditingQuiz({
       ...editingQuiz,
-      questions: [...editingQuiz.questions, newQuestion]
+      questions: [...editingQuiz.questions, newQuestion],
     });
   };
 
@@ -208,38 +211,47 @@ const ViewInterviewQuestion: React.FC = () => {
     if (!editingQuiz) return;
 
     if (editingQuiz.questions.length <= 1) {
-      alert('Cannot remove the last question. A quiz must have at least one question.');
+      alert(
+        "Cannot remove the last question. A quiz must have at least one question."
+      );
       return;
     }
 
-    if (confirm('Are you sure you want to remove this question?')) {
-      const updatedQuestions = editingQuiz.questions.filter((_, index) => index !== questionIndex);
+    if (confirm("Are you sure you want to remove this question?")) {
+      const updatedQuestions = editingQuiz.questions.filter(
+        (_, index) => index !== questionIndex
+      );
       setEditingQuiz({
         ...editingQuiz,
-        questions: updatedQuestions
+        questions: updatedQuestions,
       });
     }
   };
 
   const validateQuizData = () => {
     if (!editingQuiz) return false;
+
     if (!editingQuiz.title.trim()) {
-      alert('Quiz title cannot be empty.');
+      alert("Quiz title cannot be empty.");
       return false;
     }
+
     for (let i = 0; i < editingQuiz.questions.length; i++) {
       const question = editingQuiz.questions[i];
+
       if (!question.text.trim()) {
         alert(`Question ${i + 1} text cannot be empty.`);
         return false;
       }
+
       for (let j = 0; j < question.options.length; j++) {
         if (!question.options[j].text.trim()) {
           alert(`Question ${i + 1}, Option ${j + 1} text cannot be empty.`);
           return false;
         }
       }
-      const hasCorrectOption = question.options.some(option => option.is_correct);
+
+      const hasCorrectOption = question.options.some((option) => option.is_correct);
       if (!hasCorrectOption) {
         alert(`Question ${i + 1} must have a correct answer selected.`);
         return false;
@@ -252,15 +264,17 @@ const ViewInterviewQuestion: React.FC = () => {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingQuiz) return;
+
     if (editingQuiz.questions.length === 0) {
-      alert('A quiz must have at least one question.');
+      alert("A quiz must have at least one question.");
       return;
     }
-    if (!validateQuizData()) {
-      return;
-    }
+
+    if (!validateQuizData()) return;
+
     const headers = getAuthHeaders();
     if (!headers) return;
+
     try {
       const payload = {
         title: editingQuiz.title,
@@ -277,27 +291,33 @@ const ViewInterviewQuestion: React.FC = () => {
         })),
       };
 
-      const response = await api.put(`/quiz/${editingQuiz.id}/edit/`, payload, { headers });
+      const response = await api.put(`/quiz/${editingQuiz.id}/edit/`, payload, {
+        headers,
+      });
+
       setQuizzes(quizzes.map((q) => (q.id === editingQuiz.id ? response.data : q)));
       setEditingQuiz(null);
-      alert('Quiz updated successfully!');
+      setSuccessMessage("Quiz updated successfully!");
+      setShowSuccessModal(true);
+      setTimeout(() => setShowSuccessModal(false), 1800);
     } catch (err: any) {
-      console.error('Update Error:', err.response || err);
+      console.error("Update Error:", err.response || err);
       if (err.response?.status === 401) {
-        setError('Session expired. Please log in again.');
-        localStorage.removeItem('access_token');
-        navigate('/login');
+        setError("Session expired. Please log in again.");
+        localStorage.removeItem("access_token");
+        navigate("/login");
       } else if (err.response?.status === 403) {
-        setError('Unauthorized: Only the creator can edit this quiz.');
+        setError("Unauthorized: Only the creator can edit this quiz.");
       } else {
-        const errorMessage = err.response?.data?.detail || 'Failed to update quiz. Please try again.';
+        const errorMessage =
+          err.response?.data?.detail || "Failed to update quiz. Please try again.";
         setError(errorMessage);
       }
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this quiz?')) return;
+    if (!confirm("Are you sure you want to delete this quiz?")) return;
 
     const headers = getAuthHeaders();
     if (!headers) return;
@@ -305,89 +325,487 @@ const ViewInterviewQuestion: React.FC = () => {
     try {
       await api.delete(`/quiz/${id}/delete/`, { headers });
       setQuizzes(quizzes.filter((q) => q.id !== id));
-      alert('Quiz deleted successfully!');
+      setSuccessMessage("Quiz deleted successfully!");
+      setShowSuccessModal(true);
+      setTimeout(() => setShowSuccessModal(false), 1800);
     } catch (err: any) {
-      console.error('Delete Error:', err.response || err);
+      console.error("Delete Error:", err.response || err);
       if (err.response?.status === 401) {
-        setError('Session expired. Please log in again.');
-        localStorage.removeItem('access_token');
-        navigate('/login');
+        setError("Session expired. Please log in again.");
+        localStorage.removeItem("access_token");
+        navigate("/login");
       } else if (err.response?.status === 403) {
-        setError('Unauthorized: Only the creator can delete this quiz.');
+        setError("Unauthorized: Only the creator can delete this quiz.");
       } else {
-        setError('Failed to delete quiz. Please try again.');
+        setError("Failed to delete quiz. Please try again.");
       }
     }
   };
 
-  const filteredQuizzes = quizzes.filter((q) =>
-    q.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    q.questions.some((ques) => ques.text.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredQuizzes = quizzes.filter(
+    (q) =>
+      q.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      q.questions.some((ques) =>
+        ques.text.toLowerCase().includes(searchTerm.toLowerCase())
+      )
   );
 
   return (
-    <InterviewerDashboardSkeleton>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="max-w-7xl mx-auto p-3 sm:p-4 lg:p-6">
-          {/* Header */}
-          <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl mb-6 sm:mb-8 p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2 flex items-center gap-2 sm:gap-3">
-                  <Eye className="text-blue-600" size={24} />
-                  Quiz Management
-                </h1>
-                <p className="text-gray-600 text-sm sm:text-base">View, edit, and manage your interview quizzes</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-center sm:text-right">
-                  <p className="text-sm text-gray-500">Total Quizzes</p>
-                  <p className="text-xl sm:text-2xl font-bold text-blue-600">{quizzes.length}</p>
+    <>
+      <InterviewerDashboardSkeleton>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/40">
+          <div className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 py-4 sm:py-6 space-y-6">
+            <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 p-5 sm:p-7 lg:p-8 text-white shadow-2xl border border-white/10">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.10),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.16),transparent_32%)]" />
+              <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+                <div className="max-w-2xl">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs sm:text-sm text-slate-200">
+                    <Sparkles className="w-4 h-4" />
+                    Interviewer workspace
+                  </div>
+
+                  <h1 className="mt-4 text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight">
+                    View Interview Questions
+                  </h1>
+
+                  <p className="mt-3 text-slate-300 text-sm sm:text-base leading-relaxed">
+                    View, edit, download, and manage your quiz sets.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 min-w-full xl:min-w-[520px]">
+                  <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
+                    <p className="text-slate-300 text-sm">Quiz Sets</p>
+                    <h3 className="text-3xl font-bold mt-2">{quizzes.length}</h3>
+                    <p className="text-xs text-slate-300 mt-1">Total created sets</p>
+                  </div>
+
+                  <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
+                    <p className="text-slate-300 text-sm">Showing</p>
+                    <h3 className="text-3xl font-bold mt-2">
+                      {filteredQuizzes.length}
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-1">Filtered results</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border-2 border-red-200 text-red-800 px-4 sm:px-6 py-4 rounded-xl sm:rounded-2xl mb-6 flex items-start gap-3 shadow-lg">
-              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
-              <div>
-                <h3 className="font-semibold">Error</h3>
-                <p className="text-sm sm:text-base">{error}</p>
+            {error && (
+              <div className="rounded-[28px] border border-red-200 bg-red-50 p-4 sm:p-5 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-red-800">Error</h3>
+                    <p className="text-sm text-red-700 mt-1">{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-[32px] border border-slate-200/60 bg-white/95 backdrop-blur-xl p-5 sm:p-6 shadow-[0_10px_40px_rgba(15,23,42,0.08)]">
+              <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+                <div className="relative flex-1 w-full max-w-xl">
+                  <input
+                    type="text"
+                    placeholder="Search quiz set by title or question..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
+                  />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                </div>
+
+                <div className="inline-flex items-center gap-2 text-sm text-slate-600 rounded-2xl bg-slate-100 px-4 py-3">
+                  <Filter className="w-4 h-4" />
+                  Showing {filteredQuizzes.length} of {quizzes.length} quiz sets
+                </div>
               </div>
             </div>
-          )}
 
-          {/* Edit Form */}
-          {editingQuiz && (
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl mb-6 sm:mb-8 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-4 sm:px-6 py-4">
-                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 sm:gap-3">
-                  <Edit className="text-white flex-shrink-0" size={20} />
+            <div className="hidden lg:block rounded-[32px] border border-slate-200/60 bg-white/95 backdrop-blur-xl shadow-[0_10px_40px_rgba(15,23,42,0.08)] overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-6 py-5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider w-20">
+                        S.No
+                      </th>
+                      <th className="px-6 py-5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Quiz Set
+                      </th>
+                      <th className="px-6 py-5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Details
+                      </th>
+                      <th className="px-6 py-5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Questions
+                      </th>
+                      <th className="px-6 py-5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-100">
+                    {isLoading ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-16 text-center">
+                          <RefreshCw className="animate-spin text-blue-500 mx-auto mb-4" size={40} />
+                          <p className="text-slate-600 font-medium">Loading quiz sets...</p>
+                        </td>
+                      </tr>
+                    ) : filteredQuizzes.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-16 text-center">
+                          <FolderOpen className="text-slate-300 mx-auto mb-4" size={56} />
+                          <h3 className="text-lg font-semibold text-slate-900">
+                            No quiz sets found
+                          </h3>
+                          <p className="text-sm text-slate-500 mt-2">
+                            Create your first quiz to get started.
+                          </p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredQuizzes.map((quiz, index) => (
+                        <React.Fragment key={quiz.id}>
+                          <tr className="hover:bg-blue-50/40 transition-colors">
+                            <td className="px-6 py-5 align-top">
+                              <span className="inline-flex items-center justify-center min-w-[42px] h-10 px-3 rounded-2xl bg-blue-100 text-blue-700 font-semibold text-sm">
+                                {index + 1}
+                              </span>
+                            </td>
+
+                            <td className="px-6 py-5 align-top">
+                              <button
+                                onClick={() => toggleQuizExpansion(quiz.id)}
+                                className="flex items-start gap-3 text-left group"
+                              >
+                                <span className="mt-0.5">
+                                  {expandedQuizIds.has(quiz.id) ? (
+                                    <ChevronDown className="w-5 h-5 text-blue-600" />
+                                  ) : (
+                                    <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
+                                  )}
+                                </span>
+
+                                <div>
+                                  <div className="font-semibold text-slate-900 text-base">
+                                    {quiz.title}
+                                  </div>
+                                  <div className="text-sm text-slate-500 mt-1">
+                                    Click to{" "}
+                                    {expandedQuizIds.has(quiz.id)
+                                      ? "collapse"
+                                      : "expand"}{" "}
+                                    questions
+                                  </div>
+                                </div>
+                              </button>
+                            </td>
+
+                            <td className="px-6 py-5 align-top">
+                              <div className="inline-flex items-center gap-2 rounded-2xl bg-violet-50 text-violet-700 px-3 py-2 text-sm w-fit">
+                                <Clock className="w-4 h-4" />
+                                Duration: {quiz.duration_minutes} min
+                              </div>
+                            </td>
+
+                            <td className="px-6 py-5 align-top">
+                              <div className="inline-flex items-center gap-2 rounded-2xl bg-indigo-50 text-indigo-700 px-3 py-2 text-sm font-medium">
+                                <LayoutList className="w-4 h-4" />
+                                {quiz.questions.length} Questions
+                              </div>
+                            </td>
+
+                            <td className="px-6 py-5 align-top">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleDownloadPDF(quiz)}
+                                  disabled={isDownloading.has(quiz.id)}
+                                  className="group relative inline-flex items-center justify-center w-11 h-11 rounded-2xl border border-emerald-200/60 bg-white text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300 shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50"
+                                  title="Download PDF"
+                                >
+                                  {isDownloading.has(quiz.id) ? (
+                                    <RefreshCw className="animate-spin w-4 h-4" />
+                                  ) : (
+                                    <Download className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                                  )}
+                                </button>
+
+                                <button
+                                  onClick={() => handleEdit(quiz)}
+                                  className="group relative inline-flex items-center justify-center w-11 h-11 rounded-2xl border border-amber-200/60 bg-white text-amber-600 hover:bg-amber-50 hover:border-amber-300 shadow-sm hover:shadow-md transition-all duration-200"
+                                  title="Edit Quiz"
+                                >
+                                  <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                                </button>
+
+                                <button
+                                  onClick={() => handleDelete(quiz.id)}
+                                  className="group relative inline-flex items-center justify-center w-11 h-11 rounded-2xl border border-red-200/60 bg-white text-red-600 hover:bg-red-50 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200"
+                                  title="Delete Quiz"
+                                >
+                                  <Trash className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {expandedQuizIds.has(quiz.id) &&
+                            quiz.questions.map((question, qIndex) => {
+                              const correctOptionIndex =
+                                question.options.findIndex((o) => o.is_correct) + 1;
+
+                              return (
+                                <tr
+                                  key={`${quiz.id}-${question.id}`}
+                                  className="bg-slate-50/80 border-l-4 border-blue-400"
+                                >
+                                  <td className="px-6 py-4"></td>
+
+                                  <td className="px-6 py-4 align-top">
+                                    <div className="ml-3 flex items-start gap-3">
+                                      <span className="inline-flex items-center justify-center min-w-[32px] h-8 px-2 rounded-xl bg-blue-600 text-white text-xs font-semibold">
+                                        Q{qIndex + 1}
+                                      </span>
+                                      <div className="text-sm text-slate-800 max-w-xl leading-relaxed">
+                                        {question.text}
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  <td className="px-6 py-4 align-top">
+                                    <div className="space-y-2">
+                                      {question.options.map((option, oIndex) => (
+                                        <div
+                                          key={option.id}
+                                          className={`rounded-xl px-3 py-2 text-xs ${
+                                            option.is_correct
+                                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                              : "bg-white text-slate-600 border border-slate-200"
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-semibold shrink-0">
+                                              {oIndex + 1}
+                                            </span>
+                                            <span className="truncate">{option.text}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </td>
+
+                                  <td className="px-6 py-4 align-top">
+                                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 text-emerald-700 px-3 py-1.5 text-xs font-semibold">
+                                      <CheckCircle className="w-4 h-4" />
+                                      Option {correctOptionIndex || "N/A"}
+                                    </span>
+                                  </td>
+
+                                  <td className="px-6 py-4"></td>
+                                </tr>
+                              );
+                            })}
+                        </React.Fragment>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="lg:hidden space-y-4">
+              {isLoading ? (
+                <div className="rounded-[28px] bg-white border border-slate-200 shadow-sm p-10 text-center">
+                  <RefreshCw className="animate-spin text-blue-500 mx-auto mb-4" size={40} />
+                  <p className="text-slate-600 font-medium">Loading quiz sets...</p>
+                </div>
+              ) : filteredQuizzes.length === 0 ? (
+                <div className="rounded-[28px] bg-white border border-slate-200 shadow-sm p-10 text-center">
+                  <FolderOpen className="text-slate-300 mx-auto mb-4" size={56} />
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    No quiz sets found
+                  </h3>
+                  <p className="text-sm text-slate-500 mt-2">
+                    Create your first quiz to get started.
+                  </p>
+                </div>
+              ) : (
+                filteredQuizzes.map((quiz, index) => (
+                  <div
+                    key={quiz.id}
+                    className="rounded-[28px] border border-slate-200/60 bg-white/95 backdrop-blur-xl shadow-[0_10px_40px_rgba(15,23,42,0.08)] overflow-hidden"
+                  >
+                    <div className="p-5">
+                      <div className="flex items-start justify-between gap-3 mb-4">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <span className="inline-flex items-center justify-center min-w-[38px] h-10 px-3 rounded-2xl bg-blue-100 text-blue-700 font-semibold text-sm">
+                            {index + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-slate-900 text-base truncate">
+                              {quiz.title}
+                            </h3>
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              <span className="inline-flex items-center gap-2 rounded-2xl bg-violet-50 text-violet-700 px-3 py-2 text-xs">
+                                <Clock className="w-4 h-4" />
+                                {quiz.duration_minutes} min
+                              </span>
+                              <span className="inline-flex items-center gap-2 rounded-2xl bg-indigo-50 text-indigo-700 px-3 py-2 text-xs">
+                                <LayoutList className="w-4 h-4" />
+                                {quiz.questions.length} Questions
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleDownloadPDF(quiz)}
+                            disabled={isDownloading.has(quiz.id)}
+                            className="group inline-flex items-center justify-center w-10 h-10 rounded-2xl border border-emerald-200/60 bg-white text-emerald-600 hover:bg-emerald-50 shadow-sm transition-all duration-200 disabled:opacity-50"
+                          >
+                            {isDownloading.has(quiz.id) ? (
+                              <RefreshCw className="animate-spin w-4 h-4" />
+                            ) : (
+                              <Download className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                            )}
+                          </button>
+
+                          <button
+                            onClick={() => handleEdit(quiz)}
+                            className="group inline-flex items-center justify-center w-10 h-10 rounded-2xl border border-amber-200/60 bg-white text-amber-600 hover:bg-amber-50 shadow-sm transition-all duration-200"
+                          >
+                            <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                          </button>
+
+                          <button
+                            onClick={() => handleDelete(quiz.id)}
+                            className="group inline-flex items-center justify-center w-10 h-10 rounded-2xl border border-red-200/60 bg-white text-red-600 hover:bg-red-50 shadow-sm transition-all duration-200"
+                          >
+                            <Trash className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => toggleQuizExpansion(quiz.id)}
+                        className="inline-flex items-center gap-2 text-blue-600 font-medium"
+                      >
+                        {expandedQuizIds.has(quiz.id) ? (
+                          <>
+                            <ChevronDown className="w-4 h-4" />
+                            Hide Questions
+                          </>
+                        ) : (
+                          <>
+                            <ChevronRight className="w-4 h-4" />
+                            View Questions
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {expandedQuizIds.has(quiz.id) && (
+                      <div className="border-t border-slate-200 bg-slate-50/70 p-4 space-y-4">
+                        {quiz.questions.map((question, qIndex) => {
+                          const correctOptionIndex =
+                            question.options.findIndex((o) => o.is_correct) + 1;
+
+                          return (
+                            <div
+                              key={question.id}
+                              className="rounded-2xl border border-slate-200 bg-white p-4"
+                            >
+                              <div className="flex items-start gap-3 mb-3">
+                                <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold shrink-0">
+                                  {qIndex + 1}
+                                </span>
+                                <p className="text-sm text-slate-800">{question.text}</p>
+                              </div>
+
+                              <div className="space-y-2">
+                                {question.options.map((option, oIndex) => (
+                                  <div
+                                    key={option.id}
+                                    className={`rounded-xl px-3 py-2 text-xs ${
+                                      option.is_correct
+                                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                        : "bg-slate-50 text-slate-600 border border-slate-200"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-5 h-5 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-semibold shrink-0">
+                                        {oIndex + 1}
+                                      </span>
+                                      <span>{option.text}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="mt-3">
+                                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 text-emerald-700 px-3 py-1.5 text-xs font-semibold">
+                                  <CheckCircle className="w-4 h-4" />
+                                  Correct: Option {correctOptionIndex || "N/A"}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </InterviewerDashboardSkeleton>
+
+      {editingQuiz && (
+        <div className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm p-3 sm:p-5 overflow-y-auto">
+          <div className="min-h-full flex items-center justify-center">
+            <div className="w-full max-w-3xl rounded-[28px] border border-slate-200 bg-white shadow-2xl overflow-hidden">
+             <div className="bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 px-5 sm:px-6 py-4 flex items-center justify-between gap-4">
+                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-3 min-w-0">
+                  <Edit className="w-5 h-5 shrink-0" />
                   <span className="truncate">Edit Quiz: {editingQuiz.title}</span>
                 </h2>
+
+                <button
+                  type="button"
+                  onClick={() => setEditingQuiz(null)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <form onSubmit={handleUpdate} className="p-4 sm:p-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
-                  <div className="sm:col-span-2 lg:col-span-1">
-                    <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                      <FileText className="text-blue-500" size={16} />
+              <form onSubmit={handleUpdate} className="p-4 sm:p-5 lg:p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Quiz Title
                     </label>
                     <input
                       type="text"
                       value={editingQuiz.title}
-                      onChange={(e) => setEditingQuiz({ ...editingQuiz, title: e.target.value })}
-                      className="w-full border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl transition-all duration-200"
+                      onChange={(e) =>
+                        setEditingQuiz({ ...editingQuiz, title: e.target.value })
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
                       maxLength={50}
                       required
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                      <Clock className="text-purple-500" size={16} />
+
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Duration (minutes)
                     </label>
                     <input
@@ -399,479 +817,208 @@ const ViewInterviewQuestion: React.FC = () => {
                           duration_minutes: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl transition-all duration-200"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100 transition"
                       min="1"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-4 sm:space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <h3 className="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2">
-                      <BookOpen className="text-orange-500" size={20} />
-                      Questions ({editingQuiz.questions.length})
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={handleAddQuestion}
-                      className="bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-lg sm:rounded-xl font-semibold shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center gap-2 justify-center"
-                    >
-                      <Plus size={16} />
-                      Add Question
-                    </button>
-                  </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+                    <BookOpen className="w-5 h-5 text-orange-600" />
+                    Questions ({editingQuiz.questions.length})
+                  </h3>
 
+                  <button
+                    type="button"
+                    onClick={handleAddQuestion}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 font-semibold transition w-full sm:w-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Question
+                  </button>
+                </div>
+
+                <div className="space-y-4 max-h-[42vh] overflow-y-auto pr-1">
                   {editingQuiz.questions.map((q, qIndex) => (
-                    <div key={q.id} className="border-2 border-gray-100 rounded-lg sm:rounded-2xl p-4 sm:p-6 bg-gray-50 relative">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                        <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                          <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm flex-shrink-0">
+                    <div
+                      key={q.id}
+                      className="rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-[0_6px_24px_rgba(15,23,42,0.05)]"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                        <h4 className="font-bold text-slate-900 flex items-center gap-3 flex-wrap">
+                          <span className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
                             {qIndex + 1}
                           </span>
-                          <span>Question {qIndex + 1}</span>
+                          Question {qIndex + 1}
                           {q.id < 0 && (
-                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+                            <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">
                               New
                             </span>
                           )}
                         </h4>
+
                         <button
                           type="button"
                           onClick={() => handleRemoveQuestion(qIndex)}
                           disabled={editingQuiz.questions.length <= 1}
-                          className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-110 shadow-md flex-shrink-0 ${editingQuiz.questions.length <= 1
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : 'bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700'
-                            }`}
-                          title={editingQuiz.questions.length <= 1 ? 'Cannot remove the last question' : 'Remove Question'}
+                          className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 font-medium transition ${
+                            editingQuiz.questions.length <= 1
+                              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                              : "bg-red-50 text-red-600 hover:bg-red-100"
+                          }`}
                         >
-                          <Trash2 size={16} />
+                          <Trash2 className="w-4 h-4" />
+                          Remove
                         </button>
                       </div>
 
-                      <textarea
-                        value={q.text}
-                        onChange={(e) =>
-                          setEditingQuiz({
-                            ...editingQuiz,
-                            questions: editingQuiz.questions.map((q2, i) =>
-                              i === qIndex ? { ...q2, text: e.target.value } : q2
-                            ),
-                          })
-                        }
-                        rows={3}
-                        maxLength={250}
-                        placeholder="Enter your question here..."
-                        className="w-full border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl mb-4 resize-none transition-all duration-200"
-                        required
-                      />
+                      <div className="space-y-5">
+                        <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
+                            Question Text
+                          </label>
+                          <textarea
+                            value={q.text}
+                            onChange={(e) =>
+                              setEditingQuiz({
+                                ...editingQuiz,
+                                questions: editingQuiz.questions.map((q2, i) =>
+                                  i === qIndex ? { ...q2, text: e.target.value } : q2
+                                ),
+                              })
+                            }
+                            rows={3}
+                            maxLength={250}
+                            placeholder="Enter your question here..."
+                            className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
+                            required
+                          />
+                        </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-                        {q.options.map((o, oIndex) => (
-                          <div key={o.id}>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">
-                              Option {oIndex + 1}
-                            </label>
-                            <input
-                              type="text"
-                              value={o.text}
-                              onChange={(e) =>
-                                setEditingQuiz({
-                                  ...editingQuiz,
-                                  questions: editingQuiz.questions.map((q2, i) =>
-                                    i === qIndex
-                                      ? {
-                                        ...q2,
-                                        options: q2.options.map((o2, j) =>
-                                          j === oIndex ? { ...o2, text: e.target.value } : o2
-                                        ),
-                                      }
-                                      : q2
-                                  ),
-                                })
-                              }
-                              maxLength={255}
-                              placeholder={`Enter option ${oIndex + 1}`}
-                              className="w-full border-2 border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl transition-all duration-200"
-                              required
-                            />
-                          </div>
-                        ))}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                          <CheckCircle className="text-green-500" size={16} />
-                          Correct Answer
-                        </label>
-                        <select
-                          value={q.options.findIndex((o) => o.is_correct) + 1 || ''}
-                          onChange={(e) =>
-                            setEditingQuiz({
-                              ...editingQuiz,
-                              questions: editingQuiz.questions.map((q2, i) =>
-                                i === qIndex
-                                  ? {
-                                    ...q2,
-                                    options: q2.options.map((o2, j) => ({
-                                      ...o2,
-                                      is_correct: parseInt(e.target.value) - 1 === j,
-                                    })),
-                                  }
-                                  : q2
-                              ),
-                            })
-                          }
-                          className="w-full border-2 border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl transition-all duration-200 bg-white"
-                          required
-                        >
-                          <option value="">Select Correct Option</option>
-                          {q.options.map((_, oIndex) => (
-                            <option key={oIndex} value={oIndex + 1}>
-                              Option {oIndex + 1}
-                            </option>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {q.options.map((o, oIndex) => (
+                            <div
+                              key={o.id}
+                              className="rounded-3xl border border-slate-200 bg-white p-4"
+                            >
+                              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                Option {oIndex + 1}
+                              </label>
+                              <input
+                                type="text"
+                                value={o.text}
+                                onChange={(e) =>
+                                  setEditingQuiz({
+                                    ...editingQuiz,
+                                    questions: editingQuiz.questions.map((q2, i) =>
+                                      i === qIndex
+                                        ? {
+                                            ...q2,
+                                            options: q2.options.map((o2, j) =>
+                                              j === oIndex
+                                                ? { ...o2, text: e.target.value }
+                                                : o2
+                                            ),
+                                          }
+                                        : q2
+                                    ),
+                                  })
+                                }
+                                maxLength={255}
+                                placeholder={`Enter option ${oIndex + 1}`}
+                                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                                required
+                              />
+                            </div>
                           ))}
-                        </select>
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
+                            Correct Answer
+                          </label>
+                          <select
+                            value={q.options.findIndex((o) => o.is_correct) + 1 || ""}
+                            onChange={(e) =>
+                              setEditingQuiz({
+                                ...editingQuiz,
+                                questions: editingQuiz.questions.map((q2, i) =>
+                                  i === qIndex
+                                    ? {
+                                        ...q2,
+                                        options: q2.options.map((o2, j) => ({
+                                          ...o2,
+                                          is_correct:
+                                            parseInt(e.target.value) - 1 === j,
+                                        })),
+                                      }
+                                    : q2
+                                ),
+                              })
+                            }
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition"
+                            required
+                          >
+                            <option value="">Select Correct Option</option>
+                            {q.options.map((_, oIndex) => (
+                              <option key={oIndex} value={oIndex + 1}>
+                                Option {oIndex + 1}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-6 sm:mt-8">
+                <div className="flex flex-col sm:flex-row gap-3 mt-6">
                   <button
                     type="submit"
-                    className="bg-gradient-to-r from-green-500 to-green-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl font-semibold shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center gap-2 justify-center"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 font-semibold transition"
                   >
-                    <Save size={18} />
+                    <Save className="w-4 h-4" />
                     Save Changes
                   </button>
+
                   <button
                     type="button"
                     onClick={() => setEditingQuiz(null)}
-                    className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl font-semibold shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center gap-2 justify-center"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-700 hover:bg-slate-800 text-white px-6 py-3 font-semibold transition"
                   >
-                    <X size={18} />
+                    <X className="w-4 h-4" />
                     Cancel
                   </button>
                 </div>
               </form>
             </div>
-          )}
-
-          {/* Search and Filter Section */}
-          <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl mb-6 sm:mb-8 p-4 sm:p-6">
-            <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-              <div className="relative flex-1 w-full max-w-md">
-                <input
-                  type="text"
-                  placeholder="Search quiz sets by title..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 sm:pl-12 pr-4 py-2 sm:py-3 border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg sm:rounded-xl transition-all duration-200 bg-gray-50"
-                />
-                <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-              </div>
-              <div className="flex items-center gap-3 text-sm text-gray-600">
-                <Filter className="text-gray-400" size={18} />
-                <span>Showing {filteredQuizzes.length} of {quizzes.length} quiz sets</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop Table View */}
-          <div className="hidden lg:block bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                    <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider w-12">
-                      S.No
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                      Quiz Set
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                      Details
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                      Questions
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-16 text-center">
-                        <div className="flex flex-col items-center justify-center">
-                          <RefreshCw className="animate-spin text-blue-500 mb-4" size={48} />
-                          <p className="text-gray-500 text-lg font-medium">Loading quiz sets...</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : filteredQuizzes.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-16 text-center">
-                        <div className="flex flex-col items-center justify-center text-gray-500">
-                          <BookOpen className="text-gray-300 mb-4" size={64} />
-                          <p className="text-lg font-medium">No quiz sets found</p>
-                          <p className="text-sm mt-1">Create your first quiz to get started!</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredQuizzes.map((quiz, index) => (
-                      <React.Fragment key={quiz.id}>
-                        {/* Quiz Set Row */}
-                        <tr className="hover:bg-blue-50 transition-all duration-200 border-b border-gray-100">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                              {index + 1}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <button
-                              onClick={() => toggleQuizExpansion(quiz.id)}
-                              className="flex items-center gap-3 text-left hover:text-blue-600 transition-colors duration-200"
-                            >
-                              {expandedQuizIds.has(quiz.id) ? (
-                                <ChevronDown className="text-blue-500" size={18} />
-                              ) : (
-                                <ChevronRight className="text-gray-400" size={18} />
-                              )}
-                              <div>
-                                <div className="font-medium text-gray-900 text-lg">{quiz.title}</div>
-                                <div className="text-sm text-gray-500 mt-1">
-                                  Click to {expandedQuizIds.has(quiz.id) ? 'collapse' : 'expand'} questions
-                                </div>
-                              </div>
-                            </button>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col gap-2">
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <Clock className="text-purple-500" size={14} />
-                                <span>Duration: {quiz.duration_minutes} min</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium">
-                                {quiz.questions.length} Questions
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleDownloadPDF(quiz)}
-                                disabled={isDownloading.has(quiz.id)}
-                                className="bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 p-2 rounded-lg transition-all duration-200 transform hover:scale-110 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Download PDF"
-                              >
-                                {isDownloading.has(quiz.id) ? (
-                                  <RefreshCw className="animate-spin" size={16} />
-                                ) : (
-                                  <Download size={16} />
-                                )}
-                              </button>
-                              <button
-                                onClick={() => handleEdit(quiz)}
-                                className="bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700 p-2 rounded-lg transition-all duration-200 transform hover:scale-110 shadow-md"
-                                title="Edit Quiz"
-                              >
-                                <Edit size={16} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(quiz.id)}
-                                className="bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 p-2 rounded-lg transition-all duration-200 transform hover:scale-110 shadow-md"
-                                title="Delete Quiz"
-                              >
-                                <Trash size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-
-                        {/* Expanded Questions Rows */}
-                        {expandedQuizIds.has(quiz.id) && quiz.questions.map((question, qIndex) => {
-                          const options = question.options;
-                          const correctOptionIndex = options.findIndex((o) => o.is_correct) + 1;
-                          return (
-                            <tr key={`${quiz.id}-${question.id}`} className="bg-gray-50 border-l-4 border-blue-300">
-                              <td className="px-6 py-3"></td>
-                              <td className="px-6 py-3">
-                                <div className="ml-8 flex items-center gap-2">
-                                  <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium">
-                                    Q{qIndex + 1}
-                                  </span>
-                                  <div className="text-sm text-gray-700 max-w-md">
-                                    {question.text}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-3">
-                                <div className="text-xs text-gray-500 space-y-1">
-                                  {options.map((option, oIndex) => (
-                                    <div key={option.id} className="flex items-center gap-2">
-                                      <span className="w-5 h-5 bg-gray-200 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
-                                        {oIndex + 1}
-                                      </span>
-                                      <span className="truncate max-w-xs" title={option.text}>
-                                        {option.text}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </td>
-                              <td className="px-6 py-3">
-                                <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit">
-                                  <CheckCircle size={10} />
-                                  Option {correctOptionIndex || 'N/A'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-3"></td>
-                            </tr>
-                          );
-                        })}
-                      </React.Fragment>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="lg:hidden space-y-4">
-            {isLoading ? (
-              <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-                <RefreshCw className="animate-spin text-blue-500 mb-4 mx-auto" size={48} />
-                <p className="text-gray-500 text-lg font-medium">Loading quiz sets...</p>
-              </div>
-            ) : filteredQuizzes.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-lg p-8 text-center text-gray-500">
-                <BookOpen className="text-gray-300 mb-4 mx-auto" size={64} />
-                <p className="text-lg font-medium">No quiz sets found</p>
-                <p className="text-sm mt-1">Create your first quiz to get started!</p>
-              </div>
-            ) : (
-              filteredQuizzes.map((quiz, index) => (
-                <div key={quiz.id} className="bg-white rounded-xl shadow-lg overflow-hidden">
-                  {/* Quiz Header */}
-                  <div className="p-4 border-b border-gray-100">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium flex-shrink-0">
-                          {index + 1}
-                        </span>
-                        <h3 className="font-semibold text-gray-900 text-base truncate">{quiz.title}</h3>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => handleDownloadPDF(quiz)}
-                          disabled={isDownloading.has(quiz.id)}
-                          className="bg-green-50 text-green-600 hover:bg-green-100 p-2 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Download PDF"
-                        >
-                          {isDownloading.has(quiz.id) ? (
-                            <RefreshCw className="animate-spin" size={14} />
-                          ) : (
-                            <Download size={14} />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleEdit(quiz)}
-                          className="bg-yellow-50 text-yellow-600 hover:bg-yellow-100 p-2 rounded-lg transition-all duration-200"
-                          title="Edit Quiz"
-                        >
-                          <Edit size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(quiz.id)}
-                          className="bg-red-50 text-red-600 hover:bg-red-100 p-2 rounded-lg transition-all duration-200"
-                          title="Delete Quiz"
-                        >
-                          <Trash size={14} />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <Clock className="text-purple-500" size={14} />
-                        <span>{quiz.duration_minutes} min</span>
-                      </div>
-                      <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-xs font-medium">
-                        {quiz.questions.length} Questions
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={() => toggleQuizExpansion(quiz.id)}
-                      className="mt-3 flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors duration-200"
-                    >
-                      {expandedQuizIds.has(quiz.id) ? (
-                        <>
-                          <ChevronDown size={16} />
-                          <span className="text-sm font-medium">Hide Questions</span>
-                        </>
-                      ) : (
-                        <>
-                          <ChevronRight size={16} />
-                          <span className="text-sm font-medium">Show Questions</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Expanded Questions */}
-                  {expandedQuizIds.has(quiz.id) && (
-                    <div className="p-4 bg-gray-50 space-y-4">
-                      {quiz.questions.map((question, qIndex) => {
-                        const options = question.options;
-                        const correctOptionIndex = options.findIndex((o) => o.is_correct) + 1;
-                        return (
-                          <div key={question.id} className="bg-white rounded-lg p-3 border border-gray-200">
-                            <div className="flex items-start gap-2 mb-3">
-                              <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium flex-shrink-0">
-                                Q{qIndex + 1}
-                              </span>
-                              <p className="text-sm text-gray-700 flex-1">{question.text}</p>
-                            </div>
-                            
-                            <div className="space-y-2 mb-3">
-                              {options.map((option, oIndex) => (
-                                <div key={option.id} className="flex items-start gap-2 text-xs text-gray-600">
-                                  <span className="w-4 h-4 bg-gray-100 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5">
-                                    {oIndex + 1}
-                                  </span>
-                                  <span className="flex-1">{option.text}</span>
-                                </div>
-                              ))}
-                            </div>
-                            
-                            <div className="flex items-center gap-1">
-                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                                <CheckCircle size={8} />
-                                Correct: Option {correctOptionIndex || 'N/A'}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
           </div>
         </div>
-      </div>
-    </InterviewerDashboardSkeleton>
+      )}
+
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/30 backdrop-blur-sm px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl border border-green-100 p-6 text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+
+            <h3 className="text-xl font-bold text-slate-900">Success</h3>
+            <p className="text-green-600 font-medium mt-2">{successMessage}</p>
+
+            <button
+              type="button"
+              onClick={() => setShowSuccessModal(false)}
+              className="mt-5 inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 font-medium transition"
+            >
+              <X className="w-4 h-4" />
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
