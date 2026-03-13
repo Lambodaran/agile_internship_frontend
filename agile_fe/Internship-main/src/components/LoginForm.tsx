@@ -44,46 +44,72 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  e.preventDefault();
+  setIsLoading(true);
 
-    try {
-      const response = await axios.post(`${baseApi}/auth/login/`, {
-        username,
-        password,
-        role: userType === "interviewer" ? "employee" : "candidate",
-      });
+  try {
+    const response = await axios.post(`${baseApi}/auth/login/`, {
+      username,
+      password,
+      role: userType === "interviewer" ? "employee" : "candidate",
+    });
 
-      const { access, refresh } = response.data;
+    // The response from server contains: {access, role, username}
+    // Based on your screenshot: {access: "...", role: "candidate", username: "candidate"}
+    const responseData = response.data;
+    
+    console.log('Login response:', responseData); // Debug log
 
-      // Store tokens in localStorage
-      localStorage.setItem("access_token", access);
-      localStorage.setItem("refresh_token", refresh);
-      localStorage.setItem("user_type", userType);
-      localStorage.setItem("username", username);
-
-      toast({
-        title: "Login Successful",
-        description: "Welcome back!",
-        variant: "default",
-      });
-
-      // Navigate based on user type
-      setShowUserDashboard(true);
-      onLogin?.({ user_type: userType, access, refresh });
-    } catch (error: any) {
-      console.error("Login error:", error);
-      toast({
-        title: "Authentication Failed",
-        description:
-          error.response?.data?.message ||
-          "Invalid credentials. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+    // Store tokens in localStorage
+    localStorage.setItem("access_token", responseData.access);
+    
+    if (responseData.refresh) {
+      localStorage.setItem("refresh_token", responseData.refresh);
     }
-  };
+    
+    // IMPORTANT: Store the complete user data from server response
+    localStorage.setItem("auth_user", JSON.stringify({
+      username: responseData.username,
+      role: responseData.role,
+      access: responseData.access
+    }));
+    
+    // Also store individual items for compatibility
+    localStorage.setItem("access", responseData.access);
+    localStorage.setItem("role", responseData.role); // This will be "candidate" or "employee"
+    localStorage.setItem("username", responseData.username);
+    
+    // Store the userType from frontend selection (optional)
+    localStorage.setItem("user_type", userType);
+
+    toast({
+      title: "Login Successful",
+      description: "Welcome back!",
+      variant: "default",
+    });
+
+    // Navigate based on the actual role from server
+    if (responseData.role === "candidate") {
+      navigate("/candidate-dashboard");
+    } else {
+      navigate("/interviewer-dashboard");
+    }
+    
+    setShowUserDashboard(true);
+    onLogin?.({ user_type: responseData.role, access: responseData.access, refresh: responseData.refresh });
+  } catch (error: any) {
+    console.error("Login error:", error);
+    toast({
+      title: "Authentication Failed",
+      description:
+        error.response?.data?.message ||
+        "Invalid credentials. Please try again.",
+      variant: "destructive",
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();

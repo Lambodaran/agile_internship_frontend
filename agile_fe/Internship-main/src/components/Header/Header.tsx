@@ -16,28 +16,80 @@ const MOCK_NOTIFICATIONS = [
 
 const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout }) => {
   const navigate = useNavigate();
-  const getDisplayUsername = () => {
-    const stored =
-      localStorage.getItem('user') ||
-      localStorage.getItem('auth_user') ||
-      localStorage.getItem('user_info');
-
-    if (stored) {
+  
+  // Function to get logged in user details from the login response
+  const getLoggedInUser = () => {
+    // Check for the exact login response from http://127.0.0.1:8000/auth/login/
+    // The response format is: {access: "...", role: "candidate", username: "candidate"}
+    
+    // First check auth_user (most common key where login response is stored)
+    const authUser = localStorage.getItem('auth_user');
+    if (authUser) {
       try {
-        const parsed = JSON.parse(stored);
-        return parsed.username || parsed.user?.username || 'User';
-      } catch {
-        // ignore parsing issues
+        const parsed = JSON.parse(authUser);
+        // Check if this matches the login response format
+        if (parsed && parsed.role && parsed.username && parsed.access) {
+          console.log('Found login response in auth_user:', parsed);
+          return {
+            username: parsed.username,
+            role: parsed.role
+          };
+        }
+      } catch (e) {
+        console.log('Error parsing auth_user:', e);
       }
     }
 
-    const directUsername = localStorage.getItem('username');
-    if (directUsername) return directUsername;
+    // Check if the response is stored directly in 'user' key
+    const user = localStorage.getItem('user');
+    if (user) {
+      try {
+        const parsed = JSON.parse(user);
+        if (parsed && parsed.role && parsed.username) {
+          console.log('Found user in user key:', parsed);
+          return {
+            username: parsed.username,
+            role: parsed.role
+          };
+        }
+      } catch (e) {
+        console.log('Error parsing user:', e);
+      }
+    }
 
-    return localStorage.getItem('mock_username') || 'interviewer';
+    // Check for individual keys that might have been set
+    const role = localStorage.getItem('role');
+    const username = localStorage.getItem('username');
+    const access = localStorage.getItem('access');
+    
+    if (role && username) {
+      console.log('Found role and username in localStorage:', { role, username });
+      return {
+        username: username,
+        role: role
+      };
+    }
+
+    // Check for mock data as fallback
+    const mockRole = localStorage.getItem('mock_role');
+    const mockUsername = localStorage.getItem('mock_username');
+    
+    if (mockRole && mockUsername) {
+      return {
+        username: mockUsername,
+        role: mockRole
+      };
+    }
+
+    // Default fallback
+    console.log('No user found, using default interviewer');
+    return {
+      username: 'interviewer',
+      role: 'interviewer'
+    };
   };
 
-  const [username, setUsername] = useState(getDisplayUsername());
+  const [user, setUser] = useState(getLoggedInUser());
   const [profilePreview, setProfilePreview] = useState<string | null>(
     localStorage.getItem('mock_profile_preview')
   );
@@ -50,25 +102,40 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = MOCK_NOTIFICATIONS.filter((n) => !n.read).length;
-  const initials = username.charAt(0).toUpperCase() || '?';
+  const initials = user.username.charAt(0).toUpperCase() || '?';
+
+  // Log current user on every render to debug
+  console.log('Current logged in user:', user);
 
   useEffect(() => {
-    const handleStorage = () => setUsername(getDisplayUsername());
+    const handleStorageChange = () => {
+      const updatedUser = getLoggedInUser();
+      console.log('Storage changed, updated user:', updatedUser);
+      setUser(updatedUser);
+    };
 
-    window.addEventListener('storage', handleStorage);
-    handleStorage();
+    window.addEventListener('storage', handleStorageChange);
+    handleStorageChange(); // Initial load
 
-    return () => window.removeEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   useEffect(() => {
+    // Check for changes every second
     const interval = setInterval(() => {
       const savedPhoto = localStorage.getItem('mock_profile_preview');
       if (savedPhoto !== profilePreview) setProfilePreview(savedPhoto);
-    }, 3000);
+      
+      // Also check for user changes
+      const updatedUser = getLoggedInUser();
+      if (updatedUser.role !== user.role || updatedUser.username !== user.username) {
+        console.log('User changed, updating:', updatedUser);
+        setUser(updatedUser);
+      }
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [profilePreview]);
+  }, [profilePreview, user]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -93,6 +160,21 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
 
   const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
 
+  // Handle profile navigation based on actual logged in user
+  const handleProfileClick = () => {
+    console.log('Profile clicked. User role:', user.role);
+    console.log('Navigating to:', user.role === 'candidate' ? '/candidate-profile' : '/interviewer-profile');
+    
+    if (user.role === 'candidate') {
+      navigate('/candidate-profile');
+    } else {
+      navigate('/interviewer-profile');
+    }
+    
+    setIsUserMenuOpen(false);
+    setIsMobileMenuOpen(false);
+  };
+
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 shadow-[0_10px_30px_rgba(2,6,23,0.35)]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.10),transparent_25%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.18),transparent_30%)]" />
@@ -113,7 +195,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
                 Skyro
               </h1>
               <p className="hidden truncate text-xs text-slate-300 sm:block sm:text-sm">
-                Interviewer Dashboard
+                {user.role === 'candidate' ? 'Candidate Dashboard' : 'Interviewer Dashboard'}
               </p>
             </div>
           </div>
@@ -194,7 +276,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
                 </div>
 
                 <div className="hidden md:block">
-                  <p className="max-w-[150px] truncate text-sm font-semibold">{username}</p>
+                  <p className="max-w-[150px] truncate text-sm font-semibold">{user.username}</p>
                 </div>
 
                 <ChevronDown
@@ -211,7 +293,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
                   <div className="p-3">
                     <button
                       type="button"
-                      onClick={() => navigate('/interviewer-profile')}
+                      onClick={handleProfileClick}
                       className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
                     >
                       <User className="h-4 w-4 text-slate-500" />
@@ -246,13 +328,14 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
               {isMobileMenuOpen && (
                 <div className="absolute right-0 top-[calc(100%+12px)] w-72 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.22)]">
                   <div className="bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 px-4 py-5 text-white">
-                    <p className="truncate text-sm font-semibold">Hi, {username}</p>
-                    <p className="mt-1 text-xs text-slate-300">Interviewer Dashboard</p>
+                    <p className="truncate text-sm font-semibold">Hi, {user.username}</p>
+                    <p className="mt-1 text-xs text-slate-300">{user.role === 'candidate' ? 'Candidate Dashboard' : 'Interviewer Dashboard'}</p>
                   </div>
 
                   <div className="space-y-2 p-3">
                     <button
                       type="button"
+                      onClick={handleProfileClick}
                       className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
                     >
                       <User className="h-4 w-4 text-slate-500" />

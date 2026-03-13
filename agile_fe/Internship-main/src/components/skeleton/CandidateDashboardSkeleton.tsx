@@ -92,11 +92,11 @@ const CandidateDashboardSkeleton = ({ children }: CandidateDashboardSkeletonProp
       icon: <History className="w-5 h-5" />,
       path: "/application-history"
     },
-    {
-      label: "Profile",
-      icon: <FileText className="w-5 h-5" />,
-      path: "/candidate-profile"
-    },
+    // {
+    //   label: "Profile",
+    //   icon: <FileText className="w-5 h-5" />,
+    //   path: "/candidate-profile"
+    // },
   ];
 
   const handleLogout = () => {
@@ -157,7 +157,7 @@ const CandidateDashboardSkeleton = ({ children }: CandidateDashboardSkeletonProp
                 onClick={() => handleNavItemClick(item.path)}
                 className={`relative group cursor-pointer px-4 py-3 rounded-lg flex items-center space-x-3 transition-all duration-200 
                   ${isActive(item.path)
-                    ? "bg-blue-500 text-white shadow-md"
+                    ? "bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 shadow-[0_10px_30px_rgba(2,6,23,0.35)] text-white shadow-md"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
                   }
                   ${!isSidebarOpen && !isMobile ? 'justify-center' : ''}

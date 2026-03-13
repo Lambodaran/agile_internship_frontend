@@ -1,12 +1,12 @@
 // src/pages/interviewer/InterviewerProfile.tsx
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Lock, Upload, Save, AlertCircle } from 'lucide-react';
-import InterviewerDashboardSkeleton from '../../components/skeleton/InterviewerDashboardSkeleton'; // adjust path
+import InterviewerDashboardSkeleton from '../../components/skeleton/InterviewerDashboardSkeleton';
 
 const MOCK_INITIAL_DATA = {
   username: 'interviewer',
   email: 'interviewer@example.com',
-  profile_picture_preview: null as string | null, // data URL
+  profile_picture_preview: null as string | null,
 };
 
 const InterviewerProfile: React.FC = () => {
@@ -26,7 +26,7 @@ const InterviewerProfile: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Load from localStorage on mount (simulation of persisted user data)
+  // Load from localStorage on mount
   useEffect(() => {
     const savedUsername = localStorage.getItem('mock_username');
     const savedEmail = localStorage.getItem('mock_email');
@@ -110,7 +110,7 @@ const InterviewerProfile: React.FC = () => {
       } finally {
         setIsSaving(false);
       }
-    }, 1000); // fake network delay
+    }, 1000);
   };
 
   const initials = formData.username?.charAt(0)?.toUpperCase() || '?';
@@ -120,7 +120,7 @@ const InterviewerProfile: React.FC = () => {
       <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto">
           <div className="bg-white shadow rounded-xl overflow-hidden">
-            {/* Header */}
+            {/* Header - Updated to match Header.tsx gradient */}
             <div className="px-6 py-5 bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 shadow-[0_10px_30px_rgba(2,6,23,0.35)] text-white">
               <h1 className="text-2xl font-bold">Interviewer Profile</h1>
               <p className="mt-1 text-blue-100">Update your personal information</p>
@@ -151,13 +151,13 @@ const InterviewerProfile: React.FC = () => {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-5xl font-bold">
+                      <div className="w-full h-full bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center text-white text-5xl font-bold">
                         {initials}
                       </div>
                     )}
                   </div>
 
-                  <label className="absolute bottom-0 right-0 bg-blue-600 text-white p-2.5 rounded-full cursor-pointer shadow hover:bg-blue-700 transition">
+                  <label className="absolute bottom-0 right-0 bg-slate-950 text-white p-2.5 rounded-full cursor-pointer shadow hover:bg-blue-950 transition">
                     <Upload size={20} />
                     <input
                       type="file"
@@ -187,7 +187,7 @@ const InterviewerProfile: React.FC = () => {
                   name="username"
                   value={formData.username}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-950 focus:border-slate-950 outline-none"
                   required
                 />
               </div>
@@ -203,7 +203,7 @@ const InterviewerProfile: React.FC = () => {
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-950 focus:border-slate-950 outline-none"
                   required
                 />
               </div>
@@ -225,7 +225,7 @@ const InterviewerProfile: React.FC = () => {
                       name="current_password"
                       value={formData.current_password}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-950 focus:border-slate-950 outline-none"
                     />
                   </div>
 
@@ -238,7 +238,7 @@ const InterviewerProfile: React.FC = () => {
                       name="new_password"
                       value={formData.new_password}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-950 focus:border-slate-950 outline-none"
                     />
                   </div>
 
@@ -251,7 +251,7 @@ const InterviewerProfile: React.FC = () => {
                       name="confirm_password"
                       value={formData.confirm_password}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-950 focus:border-slate-950 outline-none"
                     />
                   </div>
                 </div>
@@ -263,8 +263,8 @@ const InterviewerProfile: React.FC = () => {
                   type="submit"
                   disabled={isSaving}
                   className={`
-                    flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium
-                    hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2
+                    flex items-center gap-2 px-6 py-3 bg-slate-950 text-white rounded-lg font-medium
+                    hover:bg-blue-950 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2
                     disabled:opacity-60 disabled:cursor-not-allowed transition-colors
                   `}
                 >
