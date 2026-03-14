@@ -1,7 +1,28 @@
-import CandidateDashboardSkeleton from '../skeleton/CandidateDashboardSkeleton'
-import { useState, useEffect } from "react";
-import axios from "axios";
-import { Search, MapPin, Clock, Calendar, Users, Building2, X, FileText, Mail, Phone, User, CheckCircle, AlertCircle } from "lucide-react";
+import CandidateDashboardSkeleton from '../skeleton/CandidateDashboardSkeleton';
+import { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
+import {
+  Search,
+  MapPin,
+  Clock,
+  Calendar,
+  Users,
+  Building2,
+  X,
+  FileText,
+  Mail,
+  Phone,
+  User,
+  CheckCircle,
+  AlertCircle,
+  Bookmark,
+  Briefcase,
+  Sparkles,
+  GraduationCap,
+  Wallet,
+  ArrowRight,
+  Loader2,
+} from 'lucide-react';
 
 const baseApi = import.meta.env.VITE_BASE_API;
 
@@ -34,35 +55,20 @@ interface Internship {
 
 const CandidateInternship: React.FC = () => {
   const [internships, setInternships] = useState<Internship[]>([]);
-  const [selectedNature, setSelectedNature] = useState("");
+  const [selectedNature, setSelectedNature] = useState('');
   const [selectedInternship, setSelectedInternship] = useState<Internship | null>(null);
   const [loading, setLoading] = useState(false);
-  const [appliedDataLoading, setAppliedDataLoading] = useState(true); // New loading state for applied data
+  const [appliedDataLoading, setAppliedDataLoading] = useState(true);
+  const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [candidateName, setCandidateName] = useState("");
-  const [candidateEmail, setCandidateEmail] = useState("");
-  const [candidatePhone, setCandidatePhone] = useState("");
+  const [candidateName, setCandidateName] = useState('');
+  const [candidateEmail, setCandidateEmail] = useState('');
+  const [candidatePhone, setCandidatePhone] = useState('');
   const [appliedInternships, setAppliedInternships] = useState<Set<number>>(new Set());
-
-  // Load applied internships from localStorage immediately on component mount
-  useEffect(() => {
-    const storedApplied = localStorage.getItem('appliedInternships');
-    if (storedApplied) {
-      try {
-        const appliedArray = JSON.parse(storedApplied);
-        if (Array.isArray(appliedArray)) {
-          setAppliedInternships(new Set<number>(appliedArray.map(id => Number(id))));
-        }
-      } catch (parseErr) {
-        console.log("Could not parse stored applied internships");
-        // Clear invalid data
-        localStorage.removeItem('appliedInternships');
-      }
-    }
-  }, []);
+  const [savedInternships, setSavedInternships] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -70,66 +76,62 @@ const CandidateInternship: React.FC = () => {
       setAppliedDataLoading(true);
       setError(null);
 
-      const token = localStorage.getItem("access_token");
+      const token = localStorage.getItem('access_token');
       if (!token) {
-        setError("No authentication token found. Please log in.");
+        setError('No authentication token found. Please log in.');
         setLoading(false);
         setAppliedDataLoading(false);
         return;
       }
 
       try {
-        // Fetch internships and applied data in parallel
-        const [internshipsResult, appliedResult] = await Promise.allSettled([
-          axios.get(`${baseApi}/internships/all-internships/`, {
-            headers: {
-              Authorization: `Token ${token}`,
-              "Content-Type": "application/json",
-            },
-          }),
-          axios.get(`${baseApi}/candidates/list-applications/`, {
-            headers: {
-              Authorization: `Token ${token}`,
-              "Content-Type": "application/json",
-            },
-          })
+        const headers = {
+          Authorization: `Token ${token}`,
+          'Content-Type': 'application/json',
+        };
+
+        const [internshipsResult, appliedResult, savedResult] = await Promise.allSettled([
+          axios.get(`${baseApi}/internships/all-internships/`, { headers }),
+          axios.get(`${baseApi}/candidates/list-applications/`, { headers }),
+          axios.get(`${baseApi}/candidates/saved-internships/`, { headers }),
         ]);
 
-        // Handle internships response
         if (internshipsResult.status === 'fulfilled') {
           const formattedInternships = internshipsResult.value.data.map((internship: any) => ({
             ...internship,
-            internship_field: internship.internship_field || "",
+            internship_field: internship.internship_field || '',
             duration_months: internship.duration_months || 0,
-            application_start_date: internship.application_start_date || "",
-            eligibility_criteria: internship.eligibility_criteria || "",
-            degrees_preferred: internship.degrees_preferred || "",
-            contact_email: internship.contact_email || "",
-            contact_mobile_number: internship.contact_mobile_number || "",
-            company_information: internship.company_information || "",
-            internship_responsibilities: internship.internship_responsibilities || "",
+            application_start_date: internship.application_start_date || '',
+            eligibility_criteria: internship.eligibility_criteria || '',
+            degrees_preferred: internship.degrees_preferred || '',
+            contact_email: internship.contact_email || '',
+            contact_mobile_number: internship.contact_mobile_number || '',
+            company_information: internship.company_information || '',
+            internship_responsibilities: internship.internship_responsibilities || '',
           }));
           setInternships(formattedInternships);
         } else {
-          throw new Error("Failed to fetch internships");
+          throw new Error('Failed to fetch internships');
         }
 
-        // Handle applied internships response
         if (appliedResult.status === 'fulfilled') {
           const appliedIds = new Set<number>(
             appliedResult.value.data.map((application: any) => Number(application.internship.id))
           );
           setAppliedInternships(appliedIds);
-          localStorage.setItem('appliedInternships', JSON.stringify(Array.from(appliedIds)));
-        } else {
-          console.log("Could not fetch applied internships from API, using localStorage data");
         }
 
+        if (savedResult.status === 'fulfilled') {
+          const savedIds = new Set<number>(
+            savedResult.value.data.map((item: any) => Number(item.internship.id))
+          );
+          setSavedInternships(savedIds);
+        }
       } catch (err: any) {
         setError(
           err.message ||
-          err.response?.data?.detail ||
-          "Failed to fetch data. Please try again."
+            err.response?.data?.detail ||
+            'Failed to fetch data. Please try again.'
         );
       } finally {
         setLoading(false);
@@ -140,12 +142,22 @@ const CandidateInternship: React.FC = () => {
     fetchData();
   }, []);
 
-  const filteredInternships = internships
-    .filter((internship) =>
-      (selectedNature ? internship.internship_nature === selectedNature : true) &&
-      (internship.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        internship.internship_role.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+  const filteredInternships = useMemo(() => {
+    return internships.filter((internship) => {
+      const matchesNature = selectedNature
+        ? internship.internship_nature === selectedNature
+        : true;
+
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        internship.company_name.toLowerCase().includes(q) ||
+        internship.internship_role.toLowerCase().includes(q) ||
+        internship.internship_field.toLowerCase().includes(q) ||
+        internship.required_skills.toLowerCase().includes(q);
+
+      return matchesNature && matchesSearch;
+    });
+  }, [internships, selectedNature, searchQuery]);
 
   const daysSincePosted = (date: string) => {
     const postedDate = new Date(date);
@@ -154,150 +166,222 @@ const CandidateInternship: React.FC = () => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
+  const resetModal = () => {
+    setSelectedInternship(null);
+    setResumeFile(null);
+    setCandidateName('');
+    setCandidateEmail('');
+    setCandidatePhone('');
+    setError(null);
+  };
+
   const handleApply = async (internship: Internship) => {
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
+
     try {
-      const token = localStorage.getItem("access_token");
+      const token = localStorage.getItem('access_token');
       if (!token) {
-        throw new Error("No authentication token found. Please log in.");
+        throw new Error('No authentication token found. Please log in.');
       }
 
       if (!resumeFile) {
-        throw new Error("Please upload a resume before applying.");
+        throw new Error('Please upload a resume before applying.');
       }
 
       const formData = new FormData();
-      formData.append("internship", internship.id.toString());
-      formData.append("company_name", internship.company_name);
-      formData.append("internship_role", internship.internship_role);
-      formData.append("internship_type", internship.internship_type);
-      formData.append("internship_field", internship.internship_field);
-      formData.append("internship_nature", internship.internship_nature);
-      formData.append("internship_description", internship.internship_description);
-      formData.append("required_skills", internship.required_skills);
-      formData.append("duration_months", internship.duration_months.toString());
-      formData.append("application_start_date", internship.application_start_date);
-      formData.append("application_end_date", internship.application_end_date);
-      formData.append("stipend", internship.stipend);
-      formData.append("eligibility_criteria", internship.eligibility_criteria);
-      formData.append("degrees_preferred", internship.degrees_preferred);
-      formData.append("contact_email", internship.contact_email);
-      formData.append("contact_mobile_number", internship.contact_mobile_number);
-      formData.append("company_information", internship.company_information);
-      formData.append("internship_responsibilities", internship.internship_responsibilities);
-      formData.append("total_vacancies", internship.total_vacancies.toString());
-      formData.append("country", internship.country);
-      formData.append("state", internship.state);
-      formData.append("district", internship.district);
-      formData.append("candidate_name", candidateName);
-      formData.append("candidate_email", candidateEmail);
-      formData.append("candidate_phone", candidatePhone);
+      formData.append('internship', internship.id.toString());
+      formData.append('company_name', internship.company_name);
+      formData.append('internship_role', internship.internship_role);
+      formData.append('internship_type', internship.internship_type);
+      formData.append('internship_field', internship.internship_field);
+      formData.append('internship_nature', internship.internship_nature);
+      formData.append('internship_description', internship.internship_description);
+      formData.append('required_skills', internship.required_skills);
+      formData.append('duration_months', internship.duration_months.toString());
+      formData.append('application_start_date', internship.application_start_date);
+      formData.append('application_end_date', internship.application_end_date);
+      formData.append('stipend', internship.stipend);
+      formData.append('eligibility_criteria', internship.eligibility_criteria);
+      formData.append('degrees_preferred', internship.degrees_preferred);
+      formData.append('contact_email', internship.contact_email);
+      formData.append('contact_mobile_number', internship.contact_mobile_number);
+      formData.append('company_information', internship.company_information);
+      formData.append('internship_responsibilities', internship.internship_responsibilities);
+      formData.append('total_vacancies', internship.total_vacancies.toString());
+      formData.append('country', internship.country);
+      formData.append('state', internship.state);
+      formData.append('district', internship.district);
+      formData.append('candidate_name', candidateName);
+      formData.append('candidate_email', candidateEmail);
+      formData.append('candidate_phone', candidatePhone);
+      formData.append('resume', resumeFile);
 
-      if (resumeFile) formData.append("resume", resumeFile);
-
-      const response = await axios.post(`${baseApi}/candidates/apply-internship/`, formData, {
+      await axios.post(`${baseApi}/candidates/apply-internship/`, formData, {
         headers: {
           Authorization: `Token ${token}`,
-          "Content-Type": "multipart/form-data",
+          'Content-Type': 'multipart/form-data',
         },
       });
 
-      setSuccessMessage("Application submitted successfully!");
-
-      // Add the internship ID to applied internships set
-      const newAppliedSet = new Set(appliedInternships).add(internship.id);
-      setAppliedInternships(newAppliedSet);
-
-      // Update localStorage
-      localStorage.setItem('appliedInternships', JSON.stringify(Array.from(newAppliedSet)));
-
-      setTimeout(() => setSuccessMessage(null), 5000);
-      setResumeFile(null);
-      setSelectedInternship(null);
-      setCandidateName("");
-      setCandidateEmail("");
-      setCandidatePhone("");
+      setSuccessMessage('Application submitted successfully!');
+      setAppliedInternships((prev) => new Set([...prev, internship.id]));
+      setTimeout(() => setSuccessMessage(null), 4000);
+      resetModal();
     } catch (err: any) {
       setError(
         err.message ||
-        err.response?.data?.detail ||
-        "Failed to apply for internship. Please try again."
+          err.response?.data?.detail ||
+          'Failed to apply for internship. Please try again.'
       );
     } finally {
       setLoading(false);
     }
   };
 
-  const resetModal = () => {
-    setSelectedInternship(null);
-    setResumeFile(null);
-    setCandidateName("");
-    setCandidateEmail("");
-    setCandidatePhone("");
+  const toggleSaveInternship = async (internshipId: number) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      setError('No authentication token found. Please log in.');
+      return;
+    }
+
+    setSavingIds((prev) => new Set([...prev, internshipId]));
     setError(null);
+
+    try {
+      const response = await axios.post(
+        `${baseApi}/candidates/saved-internships/toggle/`,
+        { internship_id: internshipId },
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      setSavedInternships((prev) => {
+        const next = new Set(prev);
+        if (response.data.saved) {
+          next.add(internshipId);
+        } else {
+          next.delete(internshipId);
+        }
+        return next;
+      });
+
+      setSuccessMessage(response.data.message || 'Saved internships updated.');
+      setTimeout(() => setSuccessMessage(null), 2500);
+    } catch (err: any) {
+      setError(
+        err.response?.data?.detail ||
+          err.response?.data?.error ||
+          'Failed to update saved internship.'
+      );
+    } finally {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(internshipId);
+        return next;
+      });
+    }
   };
 
-  // Helper function to determine if we should show the apply button
   const shouldShowApplyButton = (internshipId: number) => {
-    // If we're still loading applied data, show loading state
     if (appliedDataLoading) return null;
-
-    // If applied, show applied state
     if (appliedInternships.has(internshipId)) return false;
-
-    // Otherwise show apply button
     return true;
   };
 
   return (
     <CandidateDashboardSkeleton>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-8 text-center sm:text-left">
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Find Your Perfect Internship</h1>
-            <p className="text-gray-600 text-base sm:text-lg">Discover amazing opportunities to kickstart your career</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/40">
+        <div className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 py-4 sm:py-6 space-y-6">
+          <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 p-5 sm:p-7 lg:p-8 text-white shadow-2xl border border-white/10">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.10),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.16),transparent_32%)]" />
+            <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+              <div className="max-w-2xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs sm:text-sm text-slate-200">
+                  <Sparkles className="w-4 h-4" />
+                  Internship discovery workspace
+                </div>
+                <h1 className="mt-4 text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight">
+                  Explore Internships
+                </h1>
+                <p className="mt-3 text-slate-300 text-sm sm:text-base leading-relaxed">
+                  Discover opportunities, save the ones you like, and apply with a polished profile.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-full xl:min-w-[720px]">
+                <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">All Internships</p>
+                  <h3 className="text-3xl font-bold mt-2">{internships.length}</h3>
+                </div>
+                <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Visible Results</p>
+                  <h3 className="text-3xl font-bold mt-2">{filteredInternships.length}</h3>
+                </div>
+                <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Applied</p>
+                  <h3 className="text-3xl font-bold mt-2">{appliedInternships.size}</h3>
+                </div>
+                <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Saved</p>
+                  <h3 className="text-3xl font-bold mt-2">{savedInternships.size}</h3>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Alerts */}
           {error && (
-            <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4 rounded-r-lg shadow-sm">
-              <div className="flex items-center">
-                <AlertCircle className="h-5 w-5 text-red-400 mr-2 flex-shrink-0" />
-                <p className="text-red-700 text-sm">{error}</p>
+            <div className="rounded-[28px] border border-red-200 bg-red-50 p-4 sm:p-5 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-red-800">Error</h3>
+                  <p className="text-sm text-red-700 mt-1">{error}</p>
+                </div>
               </div>
             </div>
           )}
 
           {successMessage && (
-            <div className="mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-r-lg shadow-sm">
-              <div className="flex items-center">
-                <CheckCircle className="h-5 w-5 text-green-400 mr-2 flex-shrink-0" />
-                <p className="text-green-700 text-sm">{successMessage}</p>
+            <div className="rounded-[28px] border border-green-200 bg-green-50 p-4 sm:p-5 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-green-100 text-green-600 flex items-center justify-center shrink-0">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-green-800">Success</h3>
+                  <p className="text-sm text-green-700 mt-1">{successMessage}</p>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Search and Filter Bar */}
-          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-8">
-            <div className="flex flex-col md:flex-row gap-4 items-center">
-              <div className="relative w-full md:flex-1">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <div className="rounded-[32px] border border-slate-200/60 bg-white/95 backdrop-blur-xl p-5 sm:p-6 shadow-[0_10px_40px_rgba(15,23,42,0.08)]">
+            <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+              <div className="relative w-full lg:max-w-xl">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Search by company name or role..."
+                  placeholder="Search by company, role, field, or skill..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pl-11 text-sm sm:text-base outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
                 />
               </div>
-              <div className="w-full md:w-auto flex items-center gap-2">
+
+              <div className="w-full lg:w-56">
                 <select
                   value={selectedNature}
                   onChange={(e) => setSelectedNature(e.target.value)}
-                  className="w-full md:w-48 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm sm:text-base outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
                 >
                   <option value="">All Types</option>
                   <option value="full_time">Full Time</option>
@@ -305,318 +389,381 @@ const CandidateInternship: React.FC = () => {
                 </select>
               </div>
             </div>
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-center text-sm text-gray-600">
-              <span className="font-medium mr-1 text-bold">{filteredInternships.length}</span>Internships found
+
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
+              <span>
+                <span className="font-semibold text-slate-900">{filteredInternships.length}</span> internships found
+              </span>
               {appliedDataLoading && (
-                <span className="mt-2 sm:mt-0 sm:ml-4 text-blue-600 flex items-center">
-                  <div className="animate-spin rounded-full h-3 w-3 border-b border-blue-600 mr-1"></div>
+                <span className="text-blue-600 flex items-center">
+                  <Loader2 className="w-4 h-4 animate-spin mr-1" />
                   Loading application status...
                 </span>
               )}
             </div>
           </div>
 
-          {/* Loading State */}
           {loading && !selectedInternship && (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="text-gray-600 mt-4">Loading internships...</p>
+            <div className="rounded-[32px] border border-slate-200 bg-white p-10 text-center shadow-sm">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+              <p className="text-slate-600">Loading internships...</p>
             </div>
           )}
 
-          {/* Internships Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredInternships.map((internship) => {
-              const applyButtonState = shouldShowApplyButton(internship.id);
-
-              return (
-                <div
-                  key={internship.id}
-                  className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-blue-200 group"
-                >
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4">
-                    <div className="flex-1 mb-2 sm:mb-0">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">
-                        {internship.company_name}
-                      </h3>
-                      <p className="text-gray-600 font-medium">{internship.internship_role}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${internship.internship_nature === 'full_time'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-blue-100 text-blue-800'
-                      }`}>
-                      {internship.internship_nature.replace("_", " ").toUpperCase()}
-                    </span>
-                  </div>
-
-                  <div className="space-y-3 mb-6">
-                    <div className="flex items-center text-gray-600">
-                      <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
-                      <span className="text-sm">{internship.district}, {internship.state}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <Clock className="h-4 w-4 mr-2 flex-shrink-0" />
-                      <span className="text-sm">{internship.duration_months} months</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <Users className="h-4 w-4 mr-2 flex-shrink-0" />
-                      <span className="text-sm">{internship.total_vacancies} positions</span>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <p className="text-lg font-semibold text-green-600">
-                      {internship.stipend}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <span className="text-sm text-gray-500 flex items-center flex-shrink-0">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      {`Posted ${daysSincePosted(internship.created_at)} ${daysSincePosted(internship.created_at) === 1 ? "day" : "days"
-                        } ago`}
-                    </span>
-
-                    {applyButtonState === null ? (
-                      <div className="px-4 py-2 bg-gray-100 text-gray-500 text-sm rounded-lg font-medium flex items-center justify-center w-full sm:w-auto">
-                        <div className="animate-spin rounded-full h-3 w-3 border-b border-gray-500 mr-1"></div>
-                        Loading...
-                      </div>
-                    ) : applyButtonState === false ? (
-                      <span className="px-4 py-2 bg-green-100 text-green-700 text-sm rounded-lg font-medium flex items-center justify-center w-full sm:w-auto">
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Applied
-                      </span>
-                    ) : (
-                      <button
-                        className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium w-full sm:w-auto"
-                        onClick={() => setSelectedInternship(internship)}
-                      >
-                        Apply Now
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Empty State */}
           {!loading && filteredInternships.length === 0 && (
-            <div className="text-center py-12">
-              <Building2 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No internships found</h3>
-              <p className="text-gray-600">Try adjusting your search criteria or check back later.</p>
+            <div className="rounded-[32px] border border-slate-200 bg-white p-10 text-center shadow-sm">
+              <Building2 className="h-14 w-14 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">No internships found</h3>
+              <p className="text-sm sm:text-base text-slate-500">
+                Try adjusting your search or filters.
+              </p>
             </div>
           )}
 
-          {/* Modal */}
-          {selectedInternship && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-95 md:scale-100">
-                {/* Modal Header */}
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl z-10">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">{selectedInternship.internship_role}</h2>
-                      <p className="text-gray-600">{selectedInternship.company_name}</p>
-                    </div>
-                    <button
-                      onClick={resetModal}
-                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                      aria-label="Close modal"
-                    >
-                      <X className="h-6 w-6 text-gray-500" />
-                    </button>
-                  </div>
-                </div>
+          {!loading && filteredInternships.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {filteredInternships.map((internship) => {
+                const applyButtonState = shouldShowApplyButton(internship.id);
+                const isSaved = savedInternships.has(internship.id);
+                const isSaving = savingIds.has(internship.id);
 
-                <div className="p-6">
-                  {/* Internship Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Type & Nature</label>
-                        <p className="text-gray-900">{selectedInternship.internship_type.replace("_", " ")} • {selectedInternship.internship_nature.replace("_", " ")}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Field</label>
-                        <p className="text-gray-900">{selectedInternship.internship_field}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Duration</label>
-                        <p className="text-gray-900">{selectedInternship.duration_months} months</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Stipend</label>
-                        <p className="text-green-600 font-semibold">{selectedInternship.stipend}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Location</label>
-                        <p className="text-gray-900">{selectedInternship.district}, {selectedInternship.state}, {selectedInternship.country}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Vacancies</label>
-                        <p className="text-gray-900">{selectedInternship.total_vacancies} positions</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Application Period</label>
-                        <p className="text-gray-900 text-sm">
-                          {new Date(selectedInternship.application_start_date).toLocaleDateString()} - {new Date(selectedInternship.application_end_date).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <hr className="my-6 border-gray-200" />
-
-                  {/* Description and Details */}
-                  <div className="space-y-6 mb-8">
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-900 mb-2">Description</h4>
-                      <p className="text-gray-700 leading-relaxed">{selectedInternship.internship_description}</p>
-                    </div>
-
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-900 mb-2">Responsibilities</h4>
-                      <p className="text-gray-700 leading-relaxed">{selectedInternship.internship_responsibilities}</p>
-                    </div>
-
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-900 mb-2">Required Skills</h4>
-                      <p className="text-gray-700">{selectedInternship.required_skills}</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-2">Eligibility Criteria</h4>
-                        <p className="text-gray-700">{selectedInternship.eligibility_criteria}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-2">Preferred Degrees</h4>
-                        <p className="text-gray-700">{selectedInternship.degrees_preferred}</p>
-                      </div>
-                    </div>
-
-                    {selectedInternship.company_information && (
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-2">About Company</h4>
-                        <p className="text-gray-700 leading-relaxed">{selectedInternship.company_information}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Application Form */}
-                  <div className="bg-gray-50 rounded-xl p-6">
-                    <h4 className="text-xl font-semibold text-gray-900 mb-6">Apply for this Position</h4>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                      <div>
-                        <label htmlFor="candidateName" className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                          <User className="h-4 w-4 mr-2" />
-                          Full Name *
-                        </label>
-                        <input
-                          id="candidateName"
-                          type="text"
-                          value={candidateName}
-                          onChange={(e) => setCandidateName(e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Enter your full name"
-                        />
-                      </div>
-
-                      <div>
-                        <label htmlFor="candidateEmail" className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                          <Mail className="h-4 w-4 mr-2" />
-                          Email Address *
-                        </label>
-                        <input
-                          id="candidateEmail"
-                          type="email"
-                          value={candidateEmail}
-                          onChange={(e) => setCandidateEmail(e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Enter your email address"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mb-6">
-                      <label htmlFor="candidatePhone" className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                        <Phone className="h-4 w-4 mr-2" />
-                        Phone Number *
-                      </label>
-                      <input
-                        id="candidatePhone"
-                        type="tel"
-                        value={candidatePhone}
-                        onChange={(e) => setCandidatePhone(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter your phone number"
-                      />
-                    </div>
-
-                    <div className="mb-6">
-                      <label htmlFor="resumeFile" className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Upload Resume *
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="resumeFile"
-                          type="file"
-                          accept=".pdf,.doc,.docx"
-                          onChange={(e) => setResumeFile(e.target.files ? e.target.files[0] : null)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-                      {resumeFile && (
-                        <p className="mt-2 text-sm text-green-600 flex items-center">
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          {resumeFile.name} selected
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                      {appliedInternships.has(selectedInternship.id) ? (
-                        <div className="flex-1 px-6 py-3 bg-green-100 text-green-700 rounded-lg font-medium flex items-center justify-center">
-                          <CheckCircle className="h-5 w-5 mr-2" />
-                          Already Applied
+                return (
+                  <div
+                    key={internship.id}
+                    className="flex flex-col h-full rounded-[32px] border border-slate-200/70 bg-white shadow-[0_10px_40px_rgba(15,23,42,0.08)] overflow-hidden hover:shadow-[0_16px_50px_rgba(15,23,42,0.12)] transition-all duration-300"
+                  >
+                    <div className="p-5 sm:p-6 flex flex-col h-full">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <h3 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
+                            {internship.internship_role}
+                          </h3>
+                          <p className="text-sm sm:text-base text-blue-700 mt-1 truncate font-medium">
+                            {internship.company_name}
+                          </p>
                         </div>
-                      ) : (
+
                         <button
-                          onClick={() => handleApply(selectedInternship)}
-                          disabled={
-                            loading ||
-                            !resumeFile ||
-                            !candidateName.trim() ||
-                            !candidateEmail.trim() ||
-                            !candidatePhone.trim()
-                          }
-                          className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200 font-medium flex items-center justify-center"
+                          type="button"
+                          onClick={() => toggleSaveInternship(internship.id)}
+                          disabled={isSaving}
+                          className={`inline-flex items-center justify-center w-11 h-11 rounded-2xl border shadow-sm transition-all duration-200 ${
+                            isSaved
+                              ? 'border-blue-200 bg-blue-50 text-blue-700'
+                              : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                          }`}
+                          title={isSaved ? 'Remove from saved' : 'Save internship'}
                         >
-                          {loading ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                              Submitting...
-                            </>
+                          {isSaving ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            "Apply Now"
+                            <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
                           )}
                         </button>
-                      )}
-                      <button
-                        onClick={resetModal}
-                        className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200 font-medium w-full sm:w-auto"
-                      >
-                        {appliedInternships.has(selectedInternship.id) ? 'Close' : 'Cancel'}
-                      </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        <span className="inline-flex items-center gap-2 rounded-2xl bg-blue-50 text-blue-700 px-3 py-2 text-sm border border-blue-100">
+                          <MapPin className="w-4 h-4 text-blue-500" />
+                          {internship.district}, {internship.state}
+                        </span>
+
+                        <span className="inline-flex items-center gap-2 rounded-2xl bg-indigo-50 text-indigo-700 px-3 py-2 text-sm border border-indigo-100">
+                          <Briefcase className="w-4 h-4" />
+                          {internship.internship_nature.replace('_', ' ')}
+                        </span>
+
+                        <span className="inline-flex items-center gap-2 rounded-2xl bg-emerald-50 text-emerald-700 px-3 py-2 text-sm border border-emerald-100">
+                          <Wallet className="w-4 h-4" />
+                          {internship.stipend}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mt-5">
+                        <div className="rounded-2xl bg-amber-50 border border-amber-100 p-3">
+                          <p className="text-xs text-amber-600">Duration</p>
+                          <p className="text-sm font-semibold text-slate-900 mt-1">
+                            {internship.duration_months} months
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-rose-50 border border-rose-100 p-3">
+                          <p className="text-xs text-rose-600">Vacancies</p>
+                          <p className="text-sm font-semibold text-slate-900 mt-1">
+                            {internship.total_vacancies} positions
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-cyan-50 border border-cyan-100 p-3">
+                          <p className="text-xs text-cyan-600">Posted</p>
+                          <p className="text-sm font-semibold text-slate-900 mt-1">
+                            {daysSincePosted(internship.created_at)} day(s) ago
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-fuchsia-50 border border-fuchsia-100 p-3">
+                          <p className="text-xs text-fuchsia-600">Field</p>
+                          <p className="text-sm font-semibold text-slate-900 mt-1 capitalize">
+                            {internship.internship_field.replace('_', ' ')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5">
+                        <p className="text-xs font-semibold text-teal-600 mb-2">Description</p>
+                        <p className="text-sm text-slate-700 leading-relaxed min-h-[66px]">
+                          {internship.internship_description.slice(0, 150)}
+                          {internship.internship_description.length > 150 ? '...' : ''}
+                        </p>
+                      </div>
+
+                      <div className="mt-auto pt-5 flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
+                        <span className="text-sm text-black flex items-center">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Apply by {new Date(internship.application_end_date).toLocaleDateString()}
+                        </span>
+
+                        <div className="sm:self-end">
+                          {applyButtonState === null ? (
+                            <div className="px-4 py-2 bg-gray-100 text-gray-500 text-sm rounded-xl font-medium flex items-center justify-center border border-gray-200 min-w-[132px]">
+                              <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                              Loading...
+                            </div>
+                          ) : applyButtonState === false ? (
+                            <span className="px-4 py-2 bg-green-100 text-green-700 text-sm rounded-xl font-medium flex items-center justify-center border border-green-200 min-w-[132px]">
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Applied
+                            </span>
+                          ) : (
+                            <button
+                              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 text-sm font-semibold transition min-w-[132px]"
+                              onClick={() => setSelectedInternship(internship)}
+                            >
+                              Apply Now
+                              <ArrowRight className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {selectedInternship && (
+            <div className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-sm p-3 sm:p-5 overflow-y-auto">
+              <div className="min-h-full flex items-center justify-center">
+                <div className="w-full max-w-3xl rounded-[28px] border border-slate-200 bg-white shadow-2xl overflow-hidden">
+                  <div className="bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 px-5 sm:px-6 py-4 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <h2 className="text-lg sm:text-xl font-bold text-white truncate">
+                        Apply for {selectedInternship.internship_role}
+                      </h2>
+                      <p className="text-slate-300 text-sm mt-1 truncate">
+                        {selectedInternship.company_name}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={resetModal}
+                      className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition shrink-0"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="p-4 sm:p-5 lg:p-6 max-h-[82vh] overflow-y-auto">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                      <div className="space-y-4">
+                        <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                          <h3 className="text-base font-bold text-slate-900 mb-3">Internship Details</h3>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <p className="text-slate-500">Type & Nature</p>
+                              <p className="font-semibold text-slate-900 mt-1">
+                                {selectedInternship.internship_type.replace('_', ' ')} •{' '}
+                                {selectedInternship.internship_nature.replace('_', ' ')}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-slate-500">Duration</p>
+                              <p className="font-semibold text-slate-900 mt-1">
+                                {selectedInternship.duration_months} months
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-slate-500">Location</p>
+                              <p className="font-semibold text-slate-900 mt-1">
+                                {selectedInternship.district}, {selectedInternship.state}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-slate-500">Stipend</p>
+                              <p className="font-semibold text-emerald-700 mt-1">
+                                {selectedInternship.stipend}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+                          <h3 className="text-base font-bold text-slate-900 mb-3">Role Overview</h3>
+                          <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
+                            <div>
+                              <p className="font-semibold text-slate-900 mb-1">Description</p>
+                              <p>{selectedInternship.internship_description}</p>
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-900 mb-1">Responsibilities</p>
+                              <p>{selectedInternship.internship_responsibilities}</p>
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-900 mb-1">Required Skills</p>
+                              <p>{selectedInternship.required_skills}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+                          <h3 className="text-base font-bold text-slate-900 mb-3">Eligibility & Contact</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                            <div className="rounded-2xl bg-slate-50 p-3">
+                              <p className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
+                                <GraduationCap className="w-4 h-4 text-blue-600" />
+                                Eligibility
+                              </p>
+                              <p className="text-slate-700">{selectedInternship.eligibility_criteria}</p>
+                            </div>
+                            <div className="rounded-2xl bg-slate-50 p-3">
+                              <p className="font-semibold text-slate-900 mb-1">Preferred Degrees</p>
+                              <p className="text-slate-700">{selectedInternship.degrees_preferred}</p>
+                            </div>
+                            <div className="rounded-2xl bg-slate-50 p-3">
+                              <p className="font-semibold text-slate-900 mb-1">Contact Email</p>
+                              <p className="text-slate-700 break-all">{selectedInternship.contact_email}</p>
+                            </div>
+                            <div className="rounded-2xl bg-slate-50 p-3">
+                              <p className="font-semibold text-slate-900 mb-1">Contact Number</p>
+                              <p className="text-slate-700">{selectedInternship.contact_mobile_number}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="rounded-[22px] border border-slate-200 bg-white p-4 sticky top-4">
+                          <h3 className="text-base font-bold text-slate-900 mb-4">Apply for this Position</h3>
+
+                          <div className="space-y-3">
+                            <div>
+                              <label className="flex items-center text-sm font-medium text-slate-700 mb-2">
+                                <User className="h-4 w-4 mr-2" />
+                                Full Name *
+                              </label>
+                              <input
+                                type="text"
+                                value={candidateName}
+                                onChange={(e) => setCandidateName(e.target.value)}
+                                placeholder="Enter your full name"
+                                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="flex items-center text-sm font-medium text-slate-700 mb-2">
+                                <Mail className="h-4 w-4 mr-2" />
+                                Email Address *
+                              </label>
+                              <input
+                                type="email"
+                                value={candidateEmail}
+                                onChange={(e) => setCandidateEmail(e.target.value)}
+                                placeholder="Enter your email"
+                                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="flex items-center text-sm font-medium text-slate-700 mb-2">
+                                <Phone className="h-4 w-4 mr-2" />
+                                Phone Number *
+                              </label>
+                              <input
+                                type="tel"
+                                value={candidatePhone}
+                                onChange={(e) => setCandidatePhone(e.target.value)}
+                                placeholder="Enter your phone number"
+                                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="flex items-center text-sm font-medium text-slate-700 mb-2">
+                                <FileText className="h-4 w-4 mr-2" />
+                                Upload Resume *
+                              </label>
+                              <input
+                                type="file"
+                                accept=".pdf,.doc,.docx"
+                                onChange={(e) =>
+                                  setResumeFile(e.target.files ? e.target.files[0] : null)
+                                }
+                                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
+                              />
+                              {resumeFile && (
+                                <p className="mt-2 text-sm text-green-600 flex items-center">
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  {resumeFile.name}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-5 flex flex-col gap-3">
+                            {appliedInternships.has(selectedInternship.id) ? (
+                              <div className="w-full px-6 py-3 bg-green-100 text-green-700 rounded-2xl font-medium flex items-center justify-center">
+                                <CheckCircle className="h-5 w-5 mr-2" />
+                                Already Applied
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleApply(selectedInternship)}
+                                disabled={
+                                  loading ||
+                                  !resumeFile ||
+                                  !candidateName.trim() ||
+                                  !candidateEmail.trim() ||
+                                  !candidatePhone.trim()
+                                }
+                                className="w-full rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-6 py-3 font-semibold transition inline-flex items-center justify-center gap-2"
+                              >
+                                {loading ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Submitting...
+                                  </>
+                                ) : (
+                                  <>
+                                    Apply Now
+                                    <ArrowRight className="w-4 h-4" />
+                                  </>
+                                )}
+                              </button>
+                            )}
+
+                            <button
+                              onClick={resetModal}
+                              className="w-full rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-3 font-semibold transition"
+                            >
+                              {appliedInternships.has(selectedInternship.id) ? 'Close' : 'Cancel'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

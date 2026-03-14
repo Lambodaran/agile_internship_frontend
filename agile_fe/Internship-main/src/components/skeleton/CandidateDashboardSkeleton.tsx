@@ -134,7 +134,7 @@ const CandidateDashboardSkeleton = ({ children }: CandidateDashboardSkeletonProp
           className={`bg-white shadow-lg transition-all duration-300 z-30
             ${isMobile 
               ? `fixed left-0 top-16 h-[calc(100vh-4rem)] ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full'}`
-              : `relative ${isSidebarOpen ? 'w-64 lg:w-1/4' : 'w-16'}`
+              : `relative ${isSidebarOpen ? 'w-72' : 'w-16'}`
             }
             overflow-y-auto`}
         >
