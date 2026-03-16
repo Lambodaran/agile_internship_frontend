@@ -25,6 +25,11 @@ import {
   Users,
   CheckCircle,
   BarChart2Icon as BarChartIcon,
+  PieChart as PieChartIcon,
+  LineChart as LineChartIcon,
+  Award,
+  Target,
+  AlertCircle,
 } from 'lucide-react';
 import InterviewerDashboardSkeleton from '../../components/skeleton/InterviewerDashboardSkeleton';
 
@@ -64,22 +69,24 @@ const sourceData = [
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#a78bfa'];
 
 const KPICard = ({ icon: Icon, title, value, trend }: any) => (
-  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm text-gray-500 font-medium">{title}</p>
-        <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+  <div className="rounded-[28px] border border-slate-200/60 bg-white/95 backdrop-blur-xl p-6 shadow-[0_10px_40px_rgba(15,23,42,0.08)] hover:shadow-lg transition-all duration-200">
+    <div className="flex items-start justify-between">
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-slate-500">{title}</p>
+        <p className="text-3xl font-bold text-slate-900">{value}</p>
+        {trend && (
+          <p className="text-sm flex items-center gap-1">
+            <span className={trend.startsWith('+') ? 'text-green-600' : trend.startsWith('-') ? 'text-red-600' : 'text-slate-600'}>
+              {trend}
+            </span>
+            <span className="text-slate-400">vs last period</span>
+          </p>
+        )}
       </div>
-      <Icon className="w-10 h-10 text-blue-500 opacity-80" />
+      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shrink-0">
+        <Icon className="w-6 h-6" />
+      </div>
     </div>
-    {trend && (
-      <p className="text-sm mt-3">
-        <span className={trend.startsWith('+') ? 'text-green-600' : 'text-red-600'}>
-          {trend}
-        </span>{' '}
-        vs last period
-      </p>
-    )}
   </div>
 );
 
@@ -97,64 +104,111 @@ const AnalyticsReport: React.FC = () => {
 
   return (
     <InterviewerDashboardSkeleton>
-      <div className="min-h-screen bg-gray-50 pb-12">
-        {/* Sticky Filters Bar */}
-        <div className="sticky top-0 z-20 bg-white border-b shadow-sm px-4 md:px-6 py-4">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">Analytics & Reports</h1>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/40">
+        <div className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 py-4 sm:py-6 space-y-6">
+          {/* Header with gradient */}
+          <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 p-5 sm:p-7 lg:p-8 text-white shadow-2xl border border-white/10">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.10),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.16),transparent_32%)]" />
 
-            <div className="flex flex-wrap gap-3">
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <select
-                  value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value)}
-                  className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 bg-white"
-                >
-                  <option value="7d">Last 7 days</option>
-                  <option value="30d">Last 30 days</option>
-                  <option value="90d">Last 90 days</option>
-                  <option value="ytd">Year to Date</option>
-                  <option value="all">All Time</option>
-                </select>
+            <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+              <div className="max-w-2xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs sm:text-sm text-slate-200 whitespace-nowrap">
+                  <BarChartIcon className="w-4 h-4 shrink-0" />
+                  <span>Analytics & reporting dashboard</span>
+                </div>
+
+                <h1 className="mt-4 text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight">
+                  Analytics & Reports
+                </h1>
+
+                <p className="mt-3 text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl">
+                  Track hiring metrics, analyze candidate performance, and optimize your recruitment process with data-driven insights.
+                </p>
               </div>
 
-              <div className="relative">
-                <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <select
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                  className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 bg-white"
-                >
-                  <option value="all">All Roles</option>
-                  <option value="frontend">Frontend Developer</option>
-                  <option value="python">Python Backend</option>
-                  <option value="mobile">Mobile Dev Intern</option>
-                </select>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 min-w-full xl:min-w-[620px]">
+                <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Applications</p>
+                  <h3 className="text-3xl font-bold mt-2">480</h3>
+                </div>
+
+                <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Hired</p>
+                  <h3 className="text-3xl font-bold mt-2">42</h3>
+                </div>
+
+                <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Conv. Rate</p>
+                  <h3 className="text-3xl font-bold mt-2">8.75%</h3>
+                </div>
+
+                <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Time to Hire</p>
+                  <h3 className="text-3xl font-bold mt-2">13.8d</h3>
+                </div>
               </div>
-
-              <button
-                onClick={() => handleExport('pdf')}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-              >
-                <Download size={18} />
-                Export PDF
-              </button>
-
-              <button
-                onClick={() => handleExport('csv')}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-              >
-                <Download size={18} />
-                Export CSV
-              </button>
             </div>
           </div>
-        </div>
 
-        {/* KPI Cards */}
-        <div className="max-w-7xl mx-auto px-4 md:px-6 pt-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Filters Bar */}
+          <div className="rounded-[32px] border border-slate-200/60 bg-white/95 backdrop-blur-xl p-5 sm:p-6 shadow-[0_10px_40px_rgba(15,23,42,0.08)]">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Filter className="w-5 h-5 text-slate-400" />
+                <span className="text-sm font-medium text-slate-700">Filters:</span>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <select
+                    value={dateRange}
+                    onChange={(e) => setDateRange(e.target.value)}
+                    className="pl-10 pr-8 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="7d">Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                    <option value="90d">Last 90 days</option>
+                    <option value="ytd">Year to Date</option>
+                    <option value="all">All Time</option>
+                  </select>
+                </div>
+
+                <div className="relative">
+                  <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <select
+                    value={selectedRole}
+                    onChange={(e) => setSelectedRole(e.target.value)}
+                    className="pl-10 pr-8 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="frontend">Frontend Developer</option>
+                    <option value="python">Python Backend</option>
+                    <option value="mobile">Mobile Dev Intern</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={() => handleExport('pdf')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition shadow-sm"
+                >
+                  <Download size={16} />
+                  Export PDF
+                </button>
+
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                >
+                  <Download size={16} />
+                  Export CSV
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <KPICard icon={Users} title="Total Applications" value="480" trend="+18%" />
             <KPICard icon={CheckCircle} title="Hired Candidates" value="42" trend="+5%" />
             <KPICard icon={Clock} title="Avg. Time-to-Hire" value="13.8 days" trend="-2.1 days" />
@@ -162,23 +216,35 @@ const AnalyticsReport: React.FC = () => {
           </div>
 
           {/* Charts Grid */}
-          <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {/* 1. Hiring Funnel */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <h2 className="text-lg font-semibold mb-5 flex items-center gap-2">
-                <TrendingUp size={20} className="text-blue-600" />
-                Hiring Funnel (Drop-off Analysis)
-              </h2>
+            <div className="rounded-[32px] border border-slate-200/60 bg-white/95 backdrop-blur-xl p-6 shadow-[0_10px_40px_rgba(15,23,42,0.08)]">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <TrendingUp size={20} className="text-blue-600" />
+                  Hiring Funnel (Drop-off Analysis)
+                </h2>
+                <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                  Stage-wise
+                </span>
+              </div>
               <ResponsiveContainer width="100%" height={320}>
                 <BarChart
                   data={funnelData}
                   layout="vertical"
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={100} />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis type="number" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <YAxis dataKey="name" type="category" width={100} stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'white', 
+                      borderRadius: '16px',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 10px 40px rgba(15,23,42,0.08)'
+                    }}
+                  />
                   <Bar dataKey="value" radius={[4, 4, 4, 4]}>
                     {funnelData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -189,49 +255,78 @@ const AnalyticsReport: React.FC = () => {
             </div>
 
             {/* 2. Time to Hire Trend */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <h2 className="text-lg font-semibold mb-5 flex items-center gap-2">
-                <Clock size={20} className="text-blue-600" />
-                Average Time-to-Hire Trend
-              </h2>
+            <div className="rounded-[32px] border border-slate-200/60 bg-white/95 backdrop-blur-xl p-6 shadow-[0_10px_40px_rgba(15,23,42,0.08)]">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <Clock size={20} className="text-blue-600" />
+                  Average Time-to-Hire Trend
+                </h2>
+                <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                  Monthly
+                </span>
+              </div>
               <ResponsiveContainer width="100%" height={320}>
                 <LineChart data={timeToHireData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis unit=" days" />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="days" stroke="#3b82f6" strokeWidth={2} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="month" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <YAxis unit=" days" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'white', 
+                      borderRadius: '16px',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 10px 40px rgba(15,23,42,0.08)'
+                    }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: 10 }} />
+                  <Line type="monotone" dataKey="days" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', strokeWidth: 2 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
 
-            {/* 3. Assessment Scores */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
-              <h2 className="text-lg font-semibold mb-5 flex items-center gap-2">
-                <BarChartIcon size={20} className="text-blue-600" />
-                Quiz Performance Breakdown
-              </h2>
+            {/* 3. Assessment Scores (Full Width) */}
+            <div className="lg:col-span-2 rounded-[32px] border border-slate-200/60 bg-white/95 backdrop-blur-xl p-6 shadow-[0_10px_40px_rgba(15,23,42,0.08)]">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <Award size={20} className="text-blue-600" />
+                  Quiz Performance Breakdown
+                </h2>
+                <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                  Average Score vs Pass Rate
+                </span>
+              </div>
               <ResponsiveContainer width="100%" height={360}>
                 <BarChart data={assessmentScores} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="quiz" />
-                  <YAxis yAxisId="left" orientation="left" unit="%" />
-                  <YAxis yAxisId="right" orientation="right" unit="%" />
-                  <Tooltip />
-                  <Legend />
-                  <Bar yAxisId="left" dataKey="avg" name="Average Score" fill="#3b82f6" />
-                  <Bar yAxisId="right" dataKey="passRate" name="Pass Rate" fill="#10b981" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="quiz" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <YAxis yAxisId="left" orientation="left" unit="%" stroke="#3b82f6" tick={{ fill: '#3b82f6', fontSize: 12 }} />
+                  <YAxis yAxisId="right" orientation="right" unit="%" stroke="#10b981" tick={{ fill: '#10b981', fontSize: 12 }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'white', 
+                      borderRadius: '16px',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 10px 40px rgba(15,23,42,0.08)'
+                    }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: 10 }} />
+                  <Bar yAxisId="left" dataKey="avg" name="Average Score" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar yAxisId="right" dataKey="passRate" name="Pass Rate" fill="#10b981" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
             {/* 4. Source of Candidates */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <h2 className="text-lg font-semibold mb-5 flex items-center gap-2">
-                <Users size={20} className="text-blue-600" />
-                Candidate Sources
-              </h2>
+            <div className="rounded-[32px] border border-slate-200/60 bg-white/95 backdrop-blur-xl p-6 shadow-[0_10px_40px_rgba(15,23,42,0.08)]">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <Target size={20} className="text-blue-600" />
+                  Candidate Sources
+                </h2>
+                <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                  Distribution
+                </span>
+              </div>
               <ResponsiveContainer width="100%" height={320}>
                 <PieChart>
                   <Pie
@@ -244,20 +339,37 @@ const AnalyticsReport: React.FC = () => {
                     paddingAngle={2}
                     dataKey="value"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
                   >
                     {sourceData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'white', 
+                      borderRadius: '16px',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 10px 40px rgba(15,23,42,0.08)'
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
-        </div>
 
-        <div className="max-w-7xl mx-auto px-6 mt-12 text-center text-sm text-gray-500">
-          Last updated: February 26, 2026 • Data is aggregated from all internship applications
+          {/* Footer */}
+          <div className="rounded-[32px] border border-slate-200/60 bg-white/95 backdrop-blur-xl px-6 py-4 shadow-[0_10px_40px_rgba(15,23,42,0.08)]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Clock size={16} />
+                Last updated: February 26, 2026
+              </div>
+              <p className="text-sm text-slate-400">
+                Data is aggregated from all internship applications
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </InterviewerDashboardSkeleton>
