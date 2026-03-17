@@ -1,12 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Bell, ChevronDown, LogOut, Menu, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 interface HeaderProps {
   isSidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   onLogout: () => void;
 }
+
+interface UserData {
+  username: string;
+  role: string;
+  profile_photo?: string | null;
+}
+
+const baseApi = import.meta.env.VITE_BASE_API;
 
 const MOCK_NOTIFICATIONS = [
   { id: 'n1', message: 'Nirojan attended the Frontend Quiz', time: '10 min ago', read: false },
@@ -17,19 +26,14 @@ const MOCK_NOTIFICATIONS = [
 const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout }) => {
   const navigate = useNavigate();
   
-  // Function to get logged in user details from the login response
-  const getLoggedInUser = () => {
-    // Check for the exact login response from http://127.0.0.1:8000/auth/login/
-    // The response format is: {access: "...", role: "candidate", username: "candidate"}
-    
-    // First check auth_user (most common key where login response is stored)
+  // Function to get logged in user details from localStorage
+  const getStoredUser = (): UserData => {
+    // Check for auth_user (login response)
     const authUser = localStorage.getItem('auth_user');
     if (authUser) {
       try {
         const parsed = JSON.parse(authUser);
-        // Check if this matches the login response format
-        if (parsed && parsed.role && parsed.username && parsed.access) {
-          console.log('Found login response in auth_user:', parsed);
+        if (parsed && parsed.role && parsed.username) {
           return {
             username: parsed.username,
             role: parsed.role
@@ -40,58 +44,27 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
       }
     }
 
-    // Check if the response is stored directly in 'user' key
-    const user = localStorage.getItem('user');
-    if (user) {
-      try {
-        const parsed = JSON.parse(user);
-        if (parsed && parsed.role && parsed.username) {
-          console.log('Found user in user key:', parsed);
-          return {
-            username: parsed.username,
-            role: parsed.role
-          };
-        }
-      } catch (e) {
-        console.log('Error parsing user:', e);
-      }
-    }
-
-    // Check for individual keys that might have been set
+    // Check for individual keys
     const role = localStorage.getItem('role');
     const username = localStorage.getItem('username');
-    const access = localStorage.getItem('access');
     
     if (role && username) {
-      console.log('Found role and username in localStorage:', { role, username });
       return {
         username: username,
         role: role
       };
     }
 
-    // Check for mock data as fallback
-    const mockRole = localStorage.getItem('mock_role');
-    const mockUsername = localStorage.getItem('mock_username');
-    
-    if (mockRole && mockUsername) {
-      return {
-        username: mockUsername,
-        role: mockRole
-      };
-    }
-
     // Default fallback
-    console.log('No user found, using default interviewer');
     return {
       username: 'interviewer',
       role: 'interviewer'
     };
   };
 
-  const [user, setUser] = useState(getLoggedInUser());
-  const [profilePreview, setProfilePreview] = useState<string | null>(
-    localStorage.getItem('mock_profile_preview')
+  const [user, setUser] = useState<UserData>(getStoredUser());
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(
+    localStorage.getItem('profile_photo_url') || localStorage.getItem('mock_profile_preview')
   );
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -104,38 +77,106 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
   const unreadCount = MOCK_NOTIFICATIONS.filter((n) => !n.read).length;
   const initials = user.username.charAt(0).toUpperCase() || '?';
 
-  // Log current user on every render to debug
-  console.log('Current logged in user:', user);
+  // Fetch latest user profile from API
+  const fetchUserProfile = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
 
+      // Determine which endpoint to call based on user role
+      const endpoint = user.role === 'candidate' 
+        ? `${baseApi}/profiles/candidate/`
+        : `${baseApi}/profiles/`;
+
+      const response = await axios.get(endpoint, {
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+      });
+
+      const data = response.data;
+      
+      // Update username if it changed
+      if (data.username || data.full_name) {
+        const newUsername = data.username || data.full_name || user.username;
+        if (newUsername !== user.username) {
+          setUser(prev => ({ ...prev, username: newUsername }));
+          // Update localStorage
+          localStorage.setItem('username', newUsername);
+          
+          // Update auth_user if exists
+          const authUser = localStorage.getItem('auth_user');
+          if (authUser) {
+            try {
+              const parsed = JSON.parse(authUser);
+              parsed.username = newUsername;
+              localStorage.setItem('auth_user', JSON.stringify(parsed));
+            } catch (e) {
+              console.error('Error updating auth_user:', e);
+            }
+          }
+        }
+      }
+
+      // Update profile photo
+      if (data.profile_photo_url) {
+        setProfilePhoto(data.profile_photo_url);
+        localStorage.setItem('profile_photo_url', data.profile_photo_url);
+      } else if (data.profile_photo) {
+        setProfilePhoto(data.profile_photo);
+        localStorage.setItem('profile_photo_url', data.profile_photo);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Listen for storage changes and fetch profile
   useEffect(() => {
-    const handleStorageChange = () => {
-      const updatedUser = getLoggedInUser();
-      console.log('Storage changed, updated user:', updatedUser);
-      setUser(updatedUser);
+    // Initial fetch
+    fetchUserProfile();
+
+    // Listen for storage events (when profile is updated in another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'access_token' || e.key === 'auth_user' || e.key === 'username' || e.key === 'role') {
+        const updatedUser = getStoredUser();
+        setUser(updatedUser);
+      }
+      
+      if (e.key === 'profile_photo_url' || e.key === 'mock_profile_preview') {
+        const newPhoto = localStorage.getItem(e.key);
+        if (newPhoto) setProfilePhoto(newPhoto);
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
-    handleStorageChange(); // Initial load
 
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    // Custom event listener for profile updates (for same-tab updates)
+    const handleProfileUpdate = () => {
+      fetchUserProfile();
+    };
 
-  useEffect(() => {
-    // Check for changes every second
+    window.addEventListener('profile-updated', handleProfileUpdate);
+
+    // Poll for changes every 2 seconds as a fallback
     const interval = setInterval(() => {
-      const savedPhoto = localStorage.getItem('mock_profile_preview');
-      if (savedPhoto !== profilePreview) setProfilePreview(savedPhoto);
-      
-      // Also check for user changes
-      const updatedUser = getLoggedInUser();
-      if (updatedUser.role !== user.role || updatedUser.username !== user.username) {
-        console.log('User changed, updating:', updatedUser);
-        setUser(updatedUser);
+      const storedPhoto = localStorage.getItem('profile_photo_url') || localStorage.getItem('mock_profile_preview');
+      if (storedPhoto !== profilePhoto) {
+        setProfilePhoto(storedPhoto);
       }
-    }, 1000);
 
-    return () => clearInterval(interval);
-  }, [profilePreview, user]);
+      const storedUser = getStoredUser();
+      if (storedUser.username !== user.username || storedUser.role !== user.role) {
+        setUser(storedUser);
+      }
+    }, 2000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('profile-updated', handleProfileUpdate);
+      clearInterval(interval);
+    };
+  }, [user.username, user.role, profilePhoto]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -160,17 +201,12 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
 
   const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
 
-  // Handle profile navigation based on actual logged in user
   const handleProfileClick = () => {
-    console.log('Profile clicked. User role:', user.role);
-    console.log('Navigating to:', user.role === 'candidate' ? '/candidate-profile' : '/interviewer-profile');
-    
     if (user.role === 'candidate') {
       navigate('/candidate-profile');
     } else {
       navigate('/interviewer-profile');
     }
-    
     setIsUserMenuOpen(false);
     setIsMobileMenuOpen(false);
   };
@@ -266,8 +302,8 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
                 className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-left text-white backdrop-blur-xl transition-all duration-200 hover:bg-white/15 focus:outline-none focus:ring-4 focus:ring-blue-400/30"
               >
                 <div className="h-10 w-10 overflow-hidden rounded-2xl ring-2 ring-white/15 shadow-md">
-                  {profilePreview ? (
-                    <img src={profilePreview} alt="Profile" className="h-full w-full object-cover" />
+                  {profilePhoto ? (
+                    <img src={profilePhoto} alt="Profile" className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 text-sm font-bold text-white">
                       {initials}
@@ -288,8 +324,6 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
 
               {isUserMenuOpen && (
                 <div className="absolute right-0 top-[calc(100%+12px)] w-64 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.22)] mx-3">
-                  
-
                   <div className="p-3">
                     <button
                       type="button"
@@ -318,8 +352,8 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
                 className="inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/10 text-white backdrop-blur-xl focus:outline-none focus:ring-4 focus:ring-blue-400/30"
                 aria-label="User menu"
               >
-                {profilePreview ? (
-                  <img src={profilePreview} alt="Profile" className="h-full w-full object-cover" />
+                {profilePhoto ? (
+                  <img src={profilePhoto} alt="Profile" className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-sm font-bold">{initials}</span>
                 )}

@@ -12,58 +12,89 @@ import {
   MapPin,
 } from 'lucide-react';
 import CandidateDashboardSkeleton from '../skeleton/CandidateDashboardSkeleton';
+import axios from 'axios';
 
-const MOCK_INITIAL_DATA = {
-  fullName: 'John Doe',
-  email: 'john.doe@example.com',
-  headline: 'Aspiring Full-Stack Developer',
-  university: 'University of Technology',
-  location: 'New York, NY',
-  profile_picture_preview: null as string | null,
-};
+const baseApi = import.meta.env.VITE_BASE_API;
+
+interface ProfileData {
+  full_name: string;
+  email: string;
+  professional_headline: string;
+  university: string;
+  location: string;
+  profile_photo: string | null;
+  profile_photo_url: string | null;
+}
 
 const CandidateProfile: React.FC = () => {
   const [formData, setFormData] = useState({
-    fullName: MOCK_INITIAL_DATA.fullName,
-    email: MOCK_INITIAL_DATA.email,
-    headline: MOCK_INITIAL_DATA.headline,
-    university: MOCK_INITIAL_DATA.university,
-    location: MOCK_INITIAL_DATA.location,
+    fullName: '',
+    email: '',
+    headline: '',
+    university: '',
+    location: '',
     current_password: '',
     new_password: '',
     confirm_password: '',
   });
 
-  const [previewUrl, setPreviewUrl] = useState<string | null>(
-    MOCK_INITIAL_DATA.profile_picture_preview
-  );
-
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [initialData, setInitialData] = useState<ProfileData | null>(null);
 
-  // Load from localStorage on mount
+  // Fetch profile data on mount
   useEffect(() => {
-    const savedData = localStorage.getItem('candidate_profile');
-    if (savedData) {
-      try {
-        const data = JSON.parse(savedData);
-        setFormData(prev => ({
-          ...prev,
-          fullName: data.fullName || prev.fullName,
-          email: data.email || prev.email,
-          headline: data.headline || prev.headline,
-          university: data.university || prev.university,
-          location: data.location || prev.location,
-        }));
-      } catch (error) {
-        console.error('Error loading saved data:', error);
-      }
-    }
-
-    const savedPreview = localStorage.getItem('mock_profile_preview');
-    if (savedPreview) setPreviewUrl(savedPreview);
+    fetchProfileData();
   }, []);
+
+  const fetchProfileData = async () => {
+  setIsLoading(true);
+  setError(null);
+  
+  try {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    const response = await axios.get(`${baseApi}/profiles/candidate/`, {
+      headers: {
+        Authorization: `Token ${token}`,
+      },
+    });
+
+    const data = response.data;
+    setInitialData(data);
+    
+    setFormData({
+      fullName: data.full_name || '',
+      email: data.email || '',
+      headline: data.professional_headline || '',
+      university: data.university || '',
+      location: data.location || '',
+      current_password: '',
+      new_password: '',
+      confirm_password: '',
+    });
+
+    if (data.profile_photo_url) {
+      setPreviewUrl(data.profile_photo_url);
+    }
+  } catch (err: any) {
+    console.error('Error loading profile:', err);
+    if (err.response?.status === 401) {
+      setError('Authentication failed. Please log in again.');
+    } else {
+      setError(err.response?.data?.message || 'Failed to load profile data.');
+    }
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -78,12 +109,10 @@ const CandidateProfile: React.FC = () => {
       return;
     }
 
+    setProfilePhoto(file);
     const reader = new FileReader();
     reader.onloadend = () => {
-      const dataUrl = reader.result as string;
-      setPreviewUrl(dataUrl);
-      localStorage.setItem('mock_profile_preview', dataUrl);
-      setSuccess('Photo updated successfully');
+      setPreviewUrl(reader.result as string);
       setError(null);
     };
     reader.readAsDataURL(file);
@@ -96,60 +125,127 @@ const CandidateProfile: React.FC = () => {
     setSuccess(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+const updateProfile = async (profileData: FormData) => {
+  const token = localStorage.getItem('access_token');
+  
+  const response = await axios.put(`${baseApi}/profiles/candidate/`, profileData, {
+    headers: {
+      Authorization: token ? `Token ${token}` : '',
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  
+  return response.data;
+};
+
+  const changePassword = async () => {
+    const token = localStorage.getItem('access_token');
+    
+    const response = await axios.post(
+      `${baseApi}/profiles/change-password/`,
+      {
+        current_password: formData.current_password,
+        new_password: formData.new_password,
+        confirm_new_password: formData.confirm_password,
+      },
+      {
+        headers: {
+          Authorization: token ? `Token ${token}` : '',
+        },
+      }
+    );
+    
+    return response.data;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
     setIsSaving(true);
 
-    setTimeout(() => {
-      try {
-        // Basic validation
-        if (!formData.fullName.trim()) throw new Error('Full name is required');
-        if (!formData.email.includes('@')) throw new Error('Invalid email format');
+    try {
+      // Basic validation
+      if (!formData.fullName.trim()) throw new Error('Full name is required');
+      if (!formData.email.includes('@')) throw new Error('Invalid email format');
 
-        if (formData.new_password) {
-          if (formData.new_password !== formData.confirm_password) {
-            throw new Error('Passwords do not match');
-          }
-          if (formData.new_password.length < 8) {
-            throw new Error('New password must be at least 8 characters');
-          }
-          if (!formData.current_password) {
-            throw new Error('Current password is required to change password');
-          }
+      // Update profile if any profile field changed
+      const profileChanged = 
+        formData.fullName !== initialData?.full_name ||
+        formData.email !== initialData?.email ||
+        formData.headline !== initialData?.professional_headline ||
+        formData.university !== initialData?.university ||
+        formData.location !== initialData?.location ||
+        profilePhoto !== null;
+
+      if (profileChanged) {
+        const profileFormData = new FormData();
+        profileFormData.append('full_name', formData.fullName);
+        profileFormData.append('email', formData.email);
+        profileFormData.append('professional_headline', formData.headline);
+        profileFormData.append('university', formData.university);
+        profileFormData.append('location', formData.location);
+        
+        if (profilePhoto) {
+          profileFormData.append('profile_photo', profilePhoto);
         }
 
-        // Save all data to localStorage
-        const profileData = {
-          fullName: formData.fullName,
-          email: formData.email,
-          headline: formData.headline,
-          university: formData.university,
-          location: formData.location,
-        };
-
-        localStorage.setItem('candidate_profile', JSON.stringify(profileData));
-        if (previewUrl) {
-          localStorage.setItem('mock_profile_preview', previewUrl);
-        }
-
-        setSuccess('Profile updated successfully!');
-
-        // Clear password fields
-        setFormData(prev => ({
-          ...prev,
-          current_password: '',
-          new_password: '',
-          confirm_password: '',
-        }));
-      } catch (err: any) {
-        setError(err.message || 'Failed to save changes');
-      } finally {
-        setIsSaving(false);
+        await updateProfile(profileFormData);
       }
-    }, 1000);
+
+      // Change password if password fields are filled
+      if (formData.new_password || formData.confirm_password || formData.current_password) {
+        if (!formData.current_password) {
+          throw new Error('Current password is required to change password');
+        }
+        if (formData.new_password !== formData.confirm_password) {
+          throw new Error('Passwords do not match');
+        }
+        if (formData.new_password.length < 8) {
+          throw new Error('New password must be at least 8 characters');
+        }
+
+        await changePassword();
+      }
+
+      // Refresh profile data to get updated info
+      await fetchProfileData();
+      
+      setSuccess('Profile updated successfully!');
+      setProfilePhoto(null);
+
+      // Clear password fields
+      setFormData(prev => ({
+        ...prev,
+        current_password: '',
+        new_password: '',
+        confirm_password: '',
+      }));
+    } catch (err: any) {
+      console.error('Error saving changes:', err);
+      setError(
+        err.response?.data?.error || 
+        err.response?.data?.message || 
+        err.message || 
+        'Failed to save changes'
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <CandidateDashboardSkeleton>
+        <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-8 shadow-sm">
+            <div className="w-12 h-12 mx-auto rounded-full border-4 border-slate-200 border-t-slate-950 animate-spin" />
+            <p className="mt-4 text-gray-600">Loading profile...</p>
+          </div>
+        </div>
+      </CandidateDashboardSkeleton>
+    );
+  }
 
   const initials = formData.fullName
     .split(' ')
@@ -343,6 +439,9 @@ const CandidateProfile: React.FC = () => {
                     />
                   </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Leave password fields empty if you don't want to change your password.
+                </p>
               </div>
 
               {/* Submit Button */}
@@ -362,10 +461,6 @@ const CandidateProfile: React.FC = () => {
               </div>
             </form>
           </div>
-
-          {/* <p className="mt-6 text-center text-sm text-gray-500">
-            This page is currently in mock mode — changes are saved in your browser only.
-          </p> */}
         </div>
       </div>
     </CandidateDashboardSkeleton>
