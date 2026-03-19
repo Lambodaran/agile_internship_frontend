@@ -15,13 +15,18 @@ interface UserData {
   profile_photo?: string | null;
 }
 
-const baseApi = import.meta.env.VITE_BASE_API;
+interface NotificationItem {
+  id: number;
+  type: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  application_id?: number | null;
+  interview_id?: number | null;
+  action_path?: string;
+}
 
-const MOCK_NOTIFICATIONS = [
-  { id: 'n1', message: 'Nirojan attended the Frontend Quiz', time: '10 min ago', read: false },
-  { id: 'n2', message: 'Kavindi attended the Python Exam', time: '2 hours ago', read: false },
-  { id: 'n3', message: 'Sathursan was marked as Selected', time: 'Yesterday', read: true },
-];
+const baseApi = import.meta.env.VITE_BASE_API;
 
 const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout }) => {
   const navigate = useNavigate();
@@ -69,13 +74,104 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const notificationRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = MOCK_NOTIFICATIONS.filter((n) => !n.read).length;
   const initials = user.username.charAt(0).toUpperCase() || '?';
+
+  const fetchNotifications = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      if (user.role === 'candidate') {
+        setNotifications([]);
+        setUnreadCount(0);
+        return;
+      }
+
+      const response = await axios.get(`${baseApi}/notifications/interviewer/notifications/`, {
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+      });
+
+      setNotifications(Array.isArray(response.data?.notifications) ? response.data.notifications : []);
+      setUnreadCount(Number(response.data?.unread_count || 0));
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  const formatRelativeTime = (isoTime: string) => {
+    const date = new Date(isoTime);
+    const diffMs = Date.now() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    if (diffMinutes < 1) return 'just now';
+    if (diffMinutes < 60) return `${diffMinutes} min ago`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
+  };
+
+  const markNotificationAsRead = async (notificationId: number, alreadyRead: boolean) => {
+    if (alreadyRead) return;
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      await axios.patch(
+        `${baseApi}/notifications/interviewer/notifications/${notificationId}/read/`,
+        {},
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+        }
+      );
+
+      setNotifications((prev) =>
+        prev.map((item) => (item.id === notificationId ? { ...item, is_read: true } : item))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const handleNotificationAction = async (notification: NotificationItem) => {
+    await markNotificationAsRead(notification.id, notification.is_read);
+    setIsNotificationOpen(false);
+    navigate(notification.action_path || '/interviewer-dashboard');
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token || user.role === 'candidate') return;
+
+      await axios.patch(
+        `${baseApi}/notifications/interviewer/notifications/mark-all-read/`,
+        {},
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+        }
+      );
+
+      setNotifications((prev) => prev.map((item) => ({ ...item, is_read: true })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
 
   // Fetch latest user profile from API
   const fetchUserProfile = async () => {
@@ -135,6 +231,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
   useEffect(() => {
     // Initial fetch
     fetchUserProfile();
+    fetchNotifications();
 
     // Listen for storage events (when profile is updated in another tab)
     const handleStorageChange = (e: StorageEvent) => {
@@ -154,6 +251,7 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
     // Custom event listener for profile updates (for same-tab updates)
     const handleProfileUpdate = () => {
       fetchUserProfile();
+      fetchNotifications();
     };
 
     window.addEventListener('profile-updated', handleProfileUpdate);
@@ -171,10 +269,15 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
       }
     }, 2000);
 
+    const notificationInterval = setInterval(() => {
+      fetchNotifications();
+    }, 20000);
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('profile-updated', handleProfileUpdate);
       clearInterval(interval);
+      clearInterval(notificationInterval);
     };
   }, [user.username, user.role, profilePhoto]);
 
@@ -261,31 +364,46 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
                           {unreadCount} unread update{unreadCount === 1 ? '' : 's'}
                         </p>
                       </div>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={markAllNotificationsAsRead}
+                          className="text-xs font-medium text-blue-200 hover:text-white"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  {MOCK_NOTIFICATIONS.length === 0 ? (
+                  {notifications.length === 0 ? (
                     <div className="px-5 py-10 text-center text-sm text-slate-500">
                       No notifications available.
                     </div>
                   ) : (
                     <div className="max-h-[400px] overflow-y-auto">
-                      {MOCK_NOTIFICATIONS.map((n) => (
+                      {notifications.map((n) => (
                         <div
                           key={n.id}
                           className={`border-b border-slate-100 px-5 py-4 transition hover:bg-slate-50 ${
-                            !n.read ? 'bg-blue-50/60' : 'bg-white'
+                            !n.is_read ? 'bg-blue-50/60' : 'bg-white'
                           }`}
                         >
                           <div className="flex items-start gap-3">
                             <div
                               className={`mt-1 h-2.5 w-2.5 rounded-full ${
-                                !n.read ? 'bg-blue-600' : 'bg-slate-300'
+                                !n.is_read ? 'bg-blue-600' : 'bg-slate-300'
                               }`}
                             />
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-slate-800">{n.message}</p>
-                              <p className="mt-1 text-xs text-slate-500">{n.time}</p>
+                              <p className="mt-1 text-xs text-slate-500">{formatRelativeTime(n.created_at)}</p>
+                              <button
+                                type="button"
+                                onClick={() => handleNotificationAction(n)}
+                                className="mt-2 inline-flex items-center rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+                              >
+                                View
+                              </button>
                             </div>
                           </div>
                         </div>
