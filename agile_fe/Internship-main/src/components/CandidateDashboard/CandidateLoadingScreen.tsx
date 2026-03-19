@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   FileText,
   CheckCircle,
@@ -52,8 +52,6 @@ interface ScheduledInterview {
   time: string;
   zoom: string;
 }
-
-const username = localStorage.getItem("username") || "User";
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -525,6 +523,20 @@ const CandidateLoadingScreen: React.FC = () => {
     company: string;
     role: string;
   } | null>(null);
+  const [displayName, setDisplayName] = useState("User");
+
+  useEffect(() => {
+    const storedUsername = localStorage.getItem("username") || "User";
+
+    const formattedName = storedUsername
+      .split(" ")
+      .map((word) =>
+        word ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : ""
+      )
+      .join(" ");
+
+    setDisplayName(formattedName);
+  }, []);
 
   useEffect(() => {
     const fetchCounts = async () => {
@@ -660,11 +672,6 @@ const CandidateLoadingScreen: React.FC = () => {
       return dateStr;
     }
   };
-
-  const displayName = useMemo(() => {
-    if (!username) return "User";
-    return username.charAt(0).toUpperCase() + username.slice(1);
-  }, []);
 
   if (loading) {
     return (

@@ -82,11 +82,11 @@ const CandidateDashboardSkeleton = ({ children }: CandidateDashboardSkeletonProp
       icon: <Trophy className="w-5 h-5" />,
       path: "/skill-leaderboard"
     },
-    {
-      label: "Document Center",
-      icon: <FileText className="w-5 h-5" />,
-      path: "/document-center"
-    },
+    // {
+    //   label: "Document Center",
+    //   icon: <FileText className="w-5 h-5" />,
+    //   path: "/document-center"
+    // },
     {
       label: "Application History",
       icon: <History className="w-5 h-5" />,
