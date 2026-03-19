@@ -1,5 +1,5 @@
 // src/pages/interviewer/TalentPool.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   Filter,
@@ -17,89 +17,82 @@ import {
   PlusCircle,
   X,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react';
 import InterviewerDashboardSkeleton from '../../components/skeleton/InterviewerDashboardSkeleton';
+import axios from 'axios';
+
+const baseApi = import.meta.env.VITE_BASE_API;
+
+const api = axios.create({
+  baseURL: baseApi,
+  headers: { "Content-Type": "application/json" },
+});
 
 // ─── Types ────────────────────────────────────────────────
+interface Application {
+  id: number;
+  candidate_name: string;
+  candidate_email: string;
+  candidate_phone?: string;
+  internship_role: string;
+  applied_at: string;
+  resume: string | null;
+  status: string;
+  test_score: number | null;
+  test_passed: boolean;
+  test_completed: boolean;
+  user: number;
+  internship: {
+    id: number;
+    company_name: string;
+    internship_role: string;
+  };
+}
+
+interface PassedCandidate {
+  id: number;
+  candidate_name: string;
+  internship_role: string;
+  test_score: number;
+  interview_id: number;
+  interview_date: string;
+  interview_time: string;
+  attended_meeting?: boolean;
+  is_selected?: boolean;
+}
+
+interface InterviewDecision {
+  id: number;
+  candidate_name: string;
+  internship_role: string;
+  test_score: number;
+  interview_id: number;
+  interview_date: string;
+  interview_time: string;
+  attended_meeting: boolean;
+  is_selected: boolean;
+}
+
 interface TalentCandidate {
-  id: string;
+  id: string | number;
   name: string;
   email: string;
   phone?: string;
   profilePic?: string;
   appliedRole: string;
   appliedDate: string;
-  highestScore: number; // e.g. 88
+  highestScore: number;
   skills: string[];
   tags: { label: string; color: string }[];
   notes?: string;
   lastContact?: string;
   availability?: string;
+  status: 'passed' | 'hired' | 'rejected' | 'pending';
+  resume?: string | null;
+  interviewDate?: string;
+  interviewTime?: string;
 }
-
-// ─── Mock Data ─────────────────────────────────────────────
-const MOCK_TALENT_POOL: TalentCandidate[] = [
-  {
-    id: 'tp1',
-    name: 'Nirojan Selvan',
-    email: 'nirojan.s@uni.lk',
-    appliedRole: 'Frontend Developer Intern',
-    appliedDate: '2025-11-15',
-    highestScore: 92,
-    skills: ['React', 'TypeScript', 'Tailwind CSS', 'Next.js'],
-    tags: [
-      { label: 'Strong Frontend', color: 'blue' },
-      { label: 'Summer 2026', color: 'green' },
-      { label: 'Great Culture Fit', color: 'purple' },
-    ],
-    notes: 'Very strong in React hooks & performance optimization. Slightly weak in state management theory.',
-    lastContact: '2026-01-10',
-  },
-  {
-    id: 'tp2',
-    name: 'Kavindi Sharma',
-    email: 'kavindi.sharma@gmail.com',
-    appliedRole: 'Python Backend Intern',
-    appliedDate: '2025-12-03',
-    highestScore: 85,
-    skills: ['Python', 'Django', 'PostgreSQL', 'REST API'],
-    tags: [
-      { label: 'Backend Solid', color: 'indigo' },
-      { label: 'Re-contact Q2', color: 'amber' },
-    ],
-    notes: 'Good problem solving. Needs more experience with async patterns.',
-  },
-  {
-    id: 'tp3',
-    name: 'Arjun Kumar',
-    email: 'arjun.k@tech.edu',
-    appliedRole: 'Full Stack Intern',
-    appliedDate: '2026-01-05',
-    highestScore: 78,
-    skills: ['JavaScript', 'Node.js', 'MongoDB', 'Express'],
-    tags: [
-      { label: 'MERN Stack', color: 'green' },
-      { label: 'Available Now', color: 'blue' },
-    ],
-    notes: 'Great project portfolio. Needs improvement in database design.',
-    lastContact: '2026-02-01',
-  },
-  {
-    id: 'tp4',
-    name: 'Priya Varma',
-    email: 'priya.v@college.edu',
-    appliedRole: 'UI/UX Design Intern',
-    appliedDate: '2025-12-20',
-    highestScore: 88,
-    skills: ['Figma', 'Adobe XD', 'User Research', 'Wireframing'],
-    tags: [
-      { label: 'Creative', color: 'purple' },
-      { label: 'Portfolio Ready', color: 'pink' },
-    ],
-    notes: 'Excellent design thinking. Strong portfolio presentation.',
-    lastContact: '2026-01-28',
-  },
-];
 
 // ─── Helper Components ─────────────────────────────────────
 const getTagColorClasses = (color: string) => {
@@ -111,26 +104,287 @@ const getTagColorClasses = (color: string) => {
     amber: 'bg-yellow-100 text-yellow-700 border-yellow-200',
     pink: 'bg-pink-100 text-pink-700 border-pink-200',
     red: 'bg-red-100 text-red-700 border-red-200',
+    emerald: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   };
   return colorMap[color] || 'bg-slate-100 text-slate-700 border-slate-200';
+};
+
+const getStatusTag = (status: string) => {
+  switch(status) {
+    case 'passed':
+      return { label: 'Passed Quiz', color: 'green' };
+    case 'hired':
+      return { label: 'Hired', color: 'emerald' };
+    case 'rejected':
+      return { label: 'Rejected', color: 'red' };
+    case 'pending':
+      return { label: 'Pending', color: 'amber' };
+    default:
+      return { label: status, color: 'blue' };
+  }
 };
 
 // ─── Component ─────────────────────────────────────────────
 const TalentPool: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCandidate, setSelectedCandidate] = useState<TalentCandidate | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // State for real data
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [passedCandidates, setPassedCandidates] = useState<PassedCandidate[]>([]);
+  const [interviewDecisions, setInterviewDecisions] = useState<InterviewDecision[]>([]);
+  const [talentCandidates, setTalentCandidates] = useState<TalentCandidate[]>([]);
 
-  const filteredCandidates = MOCK_TALENT_POOL.filter((c) =>
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      setError("No access token found. Please login again.");
+      setLoading(false);
+      return;
+    }
+
+    const fetchTalentData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch all data in parallel
+        const [
+          applicationsResponse,
+          passedCandidatesResponse,
+          decisionsResponse
+        ] = await Promise.all([
+          api.get('/interviewer/applications/', {
+            headers: { Authorization: `Token ${token}` }
+          }),
+          api.get('/interviewer/passed-candidates/', {
+            headers: { Authorization: `Token ${token}` }
+          }),
+          api.get('/interviewer/post-interview-decisions/', {
+            headers: { Authorization: `Token ${token}` }
+          })
+        ]);
+
+        setApplications(applicationsResponse.data || []);
+        setPassedCandidates(passedCandidatesResponse.data || []);
+        setInterviewDecisions(decisionsResponse.data || []);
+
+      } catch (err) {
+        console.error('Error fetching talent data:', err);
+        setError('Failed to load talent pool. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTalentData();
+  }, []);
+
+  // Transform API data into TalentCandidate format
+  useEffect(() => {
+    const candidates: TalentCandidate[] = [];
+    const processedIds = new Set();
+
+    // Add passed candidates (quiz passers)
+    passedCandidates.forEach(passed => {
+      if (!processedIds.has(passed.id)) {
+        processedIds.add(passed.id);
+        
+        // Find corresponding application for more details
+        const app = applications.find(a => a.id === passed.id);
+        
+        candidates.push({
+          id: passed.id,
+          name: passed.candidate_name,
+          email: app?.candidate_email || `${passed.candidate_name.toLowerCase().replace(' ', '.')}@example.com`,
+          phone: app?.candidate_phone,
+          appliedRole: passed.internship_role,
+          appliedDate: app?.applied_at ? new Date(app.applied_at).toLocaleDateString('en-CA') : new Date().toLocaleDateString('en-CA'),
+          highestScore: passed.test_score,
+          skills: [], // Skills data not available from current endpoints
+          tags: [
+            { label: 'Passed Quiz', color: 'green' },
+            ...(passed.interview_id ? [{ label: 'Interview Scheduled', color: 'blue' }] : [])
+          ],
+          status: 'passed',
+          resume: app?.resume,
+          interviewDate: passed.interview_date,
+          interviewTime: passed.interview_time,
+          notes: `Test Score: ${passed.test_score}%. ${passed.interview_id ? 'Interview scheduled.' : 'Awaiting interview scheduling.'}`
+        });
+      }
+    });
+
+    // Add hired candidates from interview decisions
+    interviewDecisions.forEach(decision => {
+      if (decision.is_selected && !processedIds.has(decision.id)) {
+        processedIds.add(decision.id);
+        
+        candidates.push({
+          id: decision.id,
+          name: decision.candidate_name,
+          email: `${decision.candidate_name.toLowerCase().replace(' ', '.')}@example.com`, // Email not in decisions endpoint
+          appliedRole: decision.internship_role,
+          appliedDate: new Date(decision.interview_date).toLocaleDateString('en-CA'),
+          highestScore: decision.test_score,
+          skills: [],
+          tags: [
+            { label: 'Hired', color: 'emerald' },
+            { label: 'Interview Completed', color: 'purple' }
+          ],
+          status: 'hired',
+          interviewDate: decision.interview_date,
+          interviewTime: decision.interview_time,
+          notes: `Selected after interview. Test score: ${decision.test_score}%. Attended meeting: ${decision.attended_meeting ? 'Yes' : 'No'}`
+        });
+      }
+    });
+
+    // Add other applications (not in passed or hired)
+    applications.forEach(app => {
+      if (!processedIds.has(app.id)) {
+        processedIds.add(app.id);
+        
+        let status: 'passed' | 'hired' | 'rejected' | 'pending' = 'pending';
+        let tags = [];
+        
+        if (app.status === 'rejected') {
+          status = 'rejected';
+          tags.push({ label: 'Rejected', color: 'red' });
+        } else if (app.test_passed) {
+          status = 'passed';
+          tags.push({ label: 'Passed Quiz', color: 'green' });
+        } else if (app.test_completed) {
+          tags.push({ label: 'Quiz Completed', color: 'amber' });
+        } else {
+          tags.push({ label: 'Applied', color: 'blue' });
+        }
+        
+        candidates.push({
+          id: app.id,
+          name: app.candidate_name,
+          email: app.candidate_email,
+          phone: app.candidate_phone,
+          appliedRole: app.internship_role,
+          appliedDate: new Date(app.applied_at).toLocaleDateString('en-CA'),
+          highestScore: app.test_score || 0,
+          skills: [], // Skills data not available
+          tags: tags,
+          status: status,
+          resume: app.resume,
+          notes: app.test_score ? `Test score: ${app.test_score}%` : 'Quiz not yet completed'
+        });
+      }
+    });
+
+    // Sort by applied date (newest first)
+    candidates.sort((a, b) => new Date(b.appliedDate).getTime() - new Date(a.appliedDate).getTime());
+    
+    setTalentCandidates(candidates);
+  }, [applications, passedCandidates, interviewDecisions]);
+
+  const filteredCandidates = talentCandidates.filter((c) =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.skills.some((s) => s.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    c.appliedRole.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.tags.some((t) => t.label.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const totalCandidates = MOCK_TALENT_POOL.length;
-  const averageScore = Math.round(
-    MOCK_TALENT_POOL.reduce((acc, c) => acc + c.highestScore, 0) / totalCandidates
-  );
+  const totalCandidates = talentCandidates.length;
+  const passedCount = talentCandidates.filter(c => c.status === 'passed').length;
+  const hiredCount = talentCandidates.filter(c => c.status === 'hired').length;
+  const averageScore = talentCandidates.length > 0
+    ? Math.round(talentCandidates.reduce((acc, c) => acc + c.highestScore, 0) / talentCandidates.length)
+    : 0;
+
+  const handleExportList = () => {
+    try {
+      const headers = ['Name', 'Email', 'Role', 'Applied Date', 'Score', 'Status', 'Tags'];
+      const rows = filteredCandidates.map(c => [
+        c.name,
+        c.email,
+        c.appliedRole,
+        c.appliedDate,
+        `${c.highestScore}%`,
+        c.status,
+        c.tags.map(t => t.label).join('; ')
+      ]);
+      
+      const csvContent = [headers, ...rows]
+        .map(row => row.join(','))
+        .join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `talent-pool-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+  };
+
+  const handleMessageCandidate = (candidate: TalentCandidate) => {
+    // Navigate to messages with this candidate
+    window.location.href = `/interviewer/messages?candidate=${candidate.id}`;
+  };
+
+  const handleDownloadResume = (candidate: TalentCandidate) => {
+    if (candidate.resume) {
+      window.open(`${baseApi}${candidate.resume}`, '_blank');
+    } else {
+      alert('Resume not available for this candidate');
+    }
+  };
+
+  const handleSendEmail = (candidate: TalentCandidate) => {
+    window.location.href = `mailto:${candidate.email}?subject=Interview%20Opportunity&body=Dear%20${candidate.name}%2C%0A%0A`;
+  };
+
+  if (loading) {
+    return (
+      <InterviewerDashboardSkeleton>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <div className="rounded-3xl border border-slate-200 bg-white/90 backdrop-blur-xl shadow-xl px-8 py-10 text-center">
+            <div className="w-12 h-12 mx-auto rounded-full border-4 border-slate-200 border-t-blue-600 animate-spin" />
+            <h3 className="mt-4 text-lg font-semibold text-slate-900">
+              Building talent pool
+            </h3>
+            <p className="text-sm text-slate-500 mt-1">
+              Gathering candidate information...
+            </p>
+          </div>
+        </div>
+      </InterviewerDashboardSkeleton>
+    );
+  }
+
+  if (error) {
+    return (
+      <InterviewerDashboardSkeleton>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <div className="rounded-3xl border border-slate-200 bg-white/90 backdrop-blur-xl shadow-xl px-8 py-10 text-center">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900">Error loading data</h3>
+            <p className="text-sm text-slate-500 mt-1">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </InterviewerDashboardSkeleton>
+    );
+  }
 
   return (
     <InterviewerDashboardSkeleton>
@@ -164,18 +418,18 @@ const TalentPool: React.FC = () => {
                 </div>
 
                 <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
-                  <p className="text-slate-300 text-sm">Active</p>
-                  <h3 className="text-3xl font-bold mt-2">{totalCandidates}</h3>
+                  <p className="text-slate-300 text-sm">Passed Quiz</p>
+                  <h3 className="text-3xl font-bold mt-2">{passedCount}</h3>
+                </div>
+
+                <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Hired</p>
+                  <h3 className="text-3xl font-bold mt-2">{hiredCount}</h3>
                 </div>
 
                 <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
                   <p className="text-slate-300 text-sm">Avg. Score</p>
                   <h3 className="text-3xl font-bold mt-2">{averageScore}%</h3>
-                </div>
-
-                <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
-                  <p className="text-slate-300 text-sm">Visible</p>
-                  <h3 className="text-3xl font-bold mt-2">{filteredCandidates.length}</h3>
                 </div>
               </div>
             </div>
@@ -194,7 +448,7 @@ const TalentPool: React.FC = () => {
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Search by name, skill, or tag..."
+                    placeholder="Search by name, role, or tag..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 pl-11 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
@@ -206,7 +460,10 @@ const TalentPool: React.FC = () => {
                   Advanced Filters
                 </button>
 
-                <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition shadow-sm">
+                <button 
+                  onClick={handleExportList}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition shadow-sm"
+                >
                   <Download size={16} />
                   Export List
                 </button>
@@ -242,67 +499,80 @@ const TalentPool: React.FC = () => {
                   </div>
                 ) : (
                   <div className="p-3 space-y-2">
-                    {filteredCandidates.map((candidate) => (
-                      <button
-                        key={candidate.id}
-                        onClick={() => setSelectedCandidate(candidate)}
-                        className={`w-full text-left rounded-2xl border p-4 transition-all duration-200 ${
-                          selectedCandidate?.id === candidate.id
-                            ? 'border-blue-200 bg-blue-50 shadow-sm'
-                            : 'border-transparent hover:border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shrink-0">
-                            {candidate.name.charAt(0).toUpperCase()}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="font-semibold text-slate-900 truncate">
-                                  {candidate.name}
-                                </p>
-                                <p className="text-sm text-slate-600 truncate">
-                                  {candidate.email}
-                                </p>
-                              </div>
-
-                              <div className="text-right">
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-green-100 text-green-700 text-sm font-semibold">
-                                  {candidate.highestScore}%
-                                </span>
-                              </div>
+                    {filteredCandidates.map((candidate) => {
+                      const statusTag = getStatusTag(candidate.status);
+                      
+                      return (
+                        <button
+                          key={candidate.id}
+                          onClick={() => setSelectedCandidate(candidate)}
+                          className={`w-full text-left rounded-2xl border p-4 transition-all duration-200 ${
+                            selectedCandidate?.id === candidate.id
+                              ? 'border-blue-200 bg-blue-50 shadow-sm'
+                              : 'border-transparent hover:border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shrink-0">
+                              {candidate.name.charAt(0).toUpperCase()}
                             </div>
 
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {candidate.tags.map((tag, i) => (
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-slate-900 truncate">
+                                    {candidate.name}
+                                  </p>
+                                  <p className="text-sm text-slate-600 truncate">
+                                    {candidate.email}
+                                  </p>
+                                </div>
+
+                                <div className="text-right">
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-semibold ${
+                                    candidate.highestScore >= 80 ? 'bg-green-100 text-green-700' :
+                                    candidate.highestScore >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-red-100 text-red-700'
+                                  }`}>
+                                    {candidate.highestScore}%
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="mt-2 flex flex-wrap gap-1.5">
                                 <span
-                                  key={i}
-                                  className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${getTagColorClasses(tag.color)}`}
+                                  className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${getTagColorClasses(statusTag.color)}`}
                                 >
-                                  {tag.label}
+                                  {statusTag.label}
                                 </span>
-                              ))}
-                            </div>
-
-                            <p className="mt-2 text-sm text-slate-600 truncate">
-                              <span className="font-medium">Skills:</span> {candidate.skills.join(' • ')}
-                            </p>
-
-                            <div className="mt-3 flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2 text-xs text-slate-400">
-                                <Briefcase size={12} />
-                                <span>{candidate.appliedRole}</span>
+                                {candidate.tags.map((tag, i) => (
+                                  <span
+                                    key={i}
+                                    className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${getTagColorClasses(tag.color)}`}
+                                  >
+                                    {tag.label}
+                                  </span>
+                                ))}
                               </div>
-                              <span className="text-xs text-slate-400 whitespace-nowrap">
-                                {candidate.appliedDate}
-                              </span>
+
+                              <div className="mt-3 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 text-xs text-slate-400">
+                                  <Briefcase size={12} />
+                                  <span>{candidate.appliedRole}</span>
+                                </div>
+                                <span className="text-xs text-slate-400 whitespace-nowrap">
+                                  {new Date(candidate.appliedDate).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  })}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -340,6 +610,11 @@ const TalentPool: React.FC = () => {
                             <p className="text-2xl font-bold text-green-700">{selectedCandidate.highestScore}%</p>
                           </div>
                         </div>
+                        {selectedCandidate.interviewDate && (
+                          <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                            Interview: {new Date(selectedCandidate.interviewDate).toLocaleDateString()}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -350,30 +625,19 @@ const TalentPool: React.FC = () => {
                         Tags
                       </h4>
                       <div className="flex flex-wrap gap-2">
+                        {getStatusTag(selectedCandidate.status) && (
+                          <span
+                            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${getTagColorClasses(getStatusTag(selectedCandidate.status).color)}`}
+                          >
+                            {getStatusTag(selectedCandidate.status).label}
+                          </span>
+                        )}
                         {selectedCandidate.tags.map((tag, i) => (
                           <span
                             key={i}
                             className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${getTagColorClasses(tag.color)}`}
                           >
                             {tag.label}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Skills */}
-                    <div>
-                      <h4 className="text-sm font-medium text-slate-500 mb-2 flex items-center gap-1">
-                        <Briefcase size={14} />
-                        Skills
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedCandidate.skills.map((skill, i) => (
-                          <span
-                            key={i}
-                            className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600"
-                          >
-                            {skill}
                           </span>
                         ))}
                       </div>
@@ -387,9 +651,30 @@ const TalentPool: React.FC = () => {
                       </div>
                       <div className="rounded-xl bg-slate-50 p-3 border border-slate-200">
                         <p className="text-xs text-slate-500">Applied Date</p>
-                        <p className="text-sm font-medium text-slate-900 mt-1">{selectedCandidate.appliedDate}</p>
+                        <p className="text-sm font-medium text-slate-900 mt-1">
+                          {new Date(selectedCandidate.appliedDate).toLocaleDateString('en-US', {
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </p>
                       </div>
                     </div>
+
+                    {/* Interview Info */}
+                    {selectedCandidate.interviewDate && (
+                      <div className="rounded-xl bg-blue-50 p-3 border border-blue-200">
+                        <p className="text-xs text-blue-600 font-medium">Interview Scheduled</p>
+                        <p className="text-sm text-blue-700 mt-1">
+                          {new Date(selectedCandidate.interviewDate).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                          {selectedCandidate.interviewTime && ` at ${selectedCandidate.interviewTime}`}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Notes */}
                     {selectedCandidate.notes && (
@@ -401,27 +686,28 @@ const TalentPool: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Last Contact */}
-                    {selectedCandidate.lastContact && (
-                      <div className="flex items-center gap-2 text-sm text-slate-500">
-                        <Clock size={14} />
-                        Last contacted: {selectedCandidate.lastContact}
-                      </div>
-                    )}
-
                     {/* Action Buttons */}
                     <div className="pt-3 space-y-3">
-                      <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition shadow-sm">
+                      <button 
+                        onClick={() => handleMessageCandidate(selectedCandidate)}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition shadow-sm"
+                      >
                         <MessageSquare size={16} />
                         Message Candidate
                       </button>
 
-                      <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm">
+                      <button 
+                        onClick={() => handleDownloadResume(selectedCandidate)}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                      >
                         <Download size={16} />
                         Download Resume
                       </button>
 
-                      <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm">
+                      <button 
+                        onClick={() => handleSendEmail(selectedCandidate)}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                      >
                         <Mail size={16} />
                         Send Email
                       </button>
@@ -449,17 +735,21 @@ const TalentPool: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Clock size={16} />
-                Talent pool last updated: February 26, 2026
+                Talent pool updated: {new Date().toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <PlusCircle size={16} />
-                  Add new candidate
+                  <Users size={16} />
+                  {passedCount} passed • {hiredCount} hired
                 </div>
                 <div className="w-px h-4 bg-slate-200" />
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <Tag size={16} />
-                  Manage tags
+                  {talentCandidates.length} total
                 </div>
               </div>
             </div>

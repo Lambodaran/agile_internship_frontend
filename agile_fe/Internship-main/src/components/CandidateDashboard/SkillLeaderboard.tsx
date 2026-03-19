@@ -19,38 +19,83 @@ import {
   Loader2,
 } from 'lucide-react';
 import CandidateDashboardSkeleton from '../../components/skeleton/CandidateDashboardSkeleton';
+import axios from 'axios';
+
+const baseApi = import.meta.env.VITE_BASE_API;
+
+const api = axios.create({
+  baseURL: baseApi,
+  headers: { "Content-Type": "application/json" },
+});
 
 // ────────────────────────────────────────────────
-// Mock data – replace with real API later
+// Types
 // ────────────────────────────────────────────────
-const MOCK_LEADERBOARD = [
-  { rank: 1, name: "Tharindu", username: "tharindu_dev", score: 2850, primaryStack: "Frontend", badge: "Top 1%" },
-  { rank: 2, name: "Lengend", username: "lengend_cse", score: 2720, primaryStack: "Full Stack", badge: "Top 5%" },
-  { rank: 3, name: "Anonymous_472", username: null, score: 2680, primaryStack: "Python", badge: null },
-  { rank: 4, name: "Nirojan", username: "niro_dev", score: 2540, primaryStack: "Backend", badge: "Rising Star" },
-  { rank: 5, name: "Kavindi", username: "kavindi_codes", score: 2450, primaryStack: "Frontend", badge: "Top 10%" },
-  { rank: 6, name: "Arjun", username: "arjun_py", score: 2380, primaryStack: "Python", badge: null },
-  { rank: 7, name: "Priya", username: "priya_design", score: 2310, primaryStack: "UI/UX", badge: "Rising Star" },
-  { rank: 8, name: "Rahul", username: "rahul_dev", score: 2250, primaryStack: "Backend", badge: null },
-  { rank: 9, name: "Deepika", username: "deepika_fullstack", score: 2180, primaryStack: "Full Stack", badge: "Top 15%" },
-  { rank: 10, name: "Suresh", username: "suresh_data", score: 2120, primaryStack: "Data Science", badge: null },
-];
+interface TestResult {
+  id: number;
+  company_name: string;
+  internship_title: string;
+  score: number;
+  passed: boolean;
+  completed_date: string;
+}
 
-const MOCK_USER_RANK = {
-  globalRank: 47,
-  domainRanks: [
-    { domain: "Frontend Development", rank: 12, percentile: "Top 8%" },
-    { domain: "Python", rank: 5, percentile: "Top 3%" },
-    { domain: "Full Stack", rank: 31, percentile: "Top 15%" },
-  ],
-  recentAchievements: [
-    { title: "Perfect Score – React Quiz", points: "+120", date: "Feb 25, 2026" },
-    { title: "Completed DSA Challenge", points: "+85", date: "Feb 22, 2026" },
-    { title: "JavaScript Mastery", points: "+200", date: "Feb 18, 2026" },
-  ],
-  totalScore: 2720,
-};
+interface Application {
+  id: number;
+  internship: {
+    id: number;
+    company_name: string;
+    internship_role: string;
+  };
+  test_score: number | null;
+  test_passed: boolean;
+  test_completed: boolean;
+  applied_at: string;
+  status: string;
+}
 
+interface UserProfile {
+  id: number;
+  username: string;
+  email: string;
+  full_name?: string;
+  profile_photo?: string;
+}
+
+interface LeaderboardEntry {
+  rank: number;
+  name: string;
+  username: string | null;
+  score: number;
+  primaryStack: string;
+  badge: string | null;
+  userId?: number;
+  testsCompleted?: number;
+}
+
+interface DomainRank {
+  domain: string;
+  rank: number;
+  percentile: string;
+  score: number;
+}
+
+interface UserRankData {
+  globalRank: number;
+  totalScore: number;
+  testsCompleted: number;
+  domainRanks: DomainRank[];
+  recentAchievements: {
+    title: string;
+    points: string;
+    date: string;
+    internship?: string;
+  }[];
+}
+
+// ────────────────────────────────────────────────
+// Helper Functions
+// ────────────────────────────────────────────────
 const getRankColor = (rank: number) => {
   if (rank === 1) return 'text-yellow-500';
   if (rank === 2) return 'text-gray-400';
@@ -65,27 +110,212 @@ const getRankBadge = (rank: number) => {
   return null;
 };
 
+const getBadgeFromRank = (rank: number, totalParticipants: number): string | null => {
+  const percentile = (rank / totalParticipants) * 100;
+  if (percentile <= 1) return "Top 1%";
+  if (percentile <= 5) return "Top 5%";
+  if (percentile <= 10) return "Top 10%";
+  if (percentile <= 15) return "Top 15%";
+  return null;
+};
+
+const getDomainFromRole = (role: string): string => {
+  const roleLower = role.toLowerCase();
+  if (roleLower.includes('frontend') || roleLower.includes('front-end')) return 'Frontend';
+  if (roleLower.includes('backend') || roleLower.includes('back-end')) return 'Backend';
+  if (roleLower.includes('fullstack') || roleLower.includes('full-stack')) return 'Full Stack';
+  if (roleLower.includes('python')) return 'Python';
+  if (roleLower.includes('data')) return 'Data Science';
+  if (roleLower.includes('ui') || roleLower.includes('ux')) return 'UI/UX';
+  return 'General';
+};
+
+// ────────────────────────────────────────────────
+// Main Component
+// ────────────────────────────────────────────────
 const SkillLeaderboard = () => {
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [userRank, setUserRank] = useState(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [userRank, setUserRank] = useState<UserRankData | null>(null);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   useEffect(() => {
-    // Simulate API delay
-    setTimeout(() => {
-      setLeaderboard(MOCK_LEADERBOARD);
-      setUserRank(MOCK_USER_RANK);
+    const token = localStorage.getItem("access_token");
+    const storedUsername = localStorage.getItem("username");
+
+    if (!token) {
+      setError("No access token found. Please login again.");
       setLoading(false);
-    }, 900);
+      return;
+    }
 
-    // Real version would be:
-    // fetch(`/api/leaderboard?filter=${filter}&search=${search}`)
-  }, [filter, search]);
+    const fetchLeaderboardData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch current user profile to get user ID
+        const profileResponse = await api.get('/profiles/', {
+          headers: { Authorization: `Token ${token}` }
+        }).catch(() => ({ data: { id: 1, username: storedUsername || 'candidate' } }));
 
+        const currentUser = profileResponse.data;
+        setCurrentUserId(currentUser.id);
+
+        // Fetch test results for all candidates
+        // Note: You might need a dedicated leaderboard endpoint
+        // For now, we'll fetch applications and test results
+        const [applicationsResponse, testResultsResponse] = await Promise.all([
+          api.get('/candidates/list-applications/', {
+            headers: { Authorization: `Token ${token}` }
+          }).catch(() => ({ data: [] })),
+          api.get('/candidates/test-results/', {
+            headers: { Authorization: `Token ${token}` }
+          }).catch(() => ({ data: { results: [] } }))
+        ]);
+
+        const applications = applicationsResponse.data || [];
+        const testResults = testResultsResponse.data?.results || [];
+
+        // Build leaderboard from test results and applications
+        const leaderboardMap = new Map<number, LeaderboardEntry>();
+        const userScores: { [key: string]: { total: number; count: number; domains: Set<string> } } = {};
+
+        // Process test results
+        testResults.forEach((result: TestResult) => {
+          const key = result.company_name + '-' + result.internship_title;
+          if (!userScores[key]) {
+            userScores[key] = { total: 0, count: 0, domains: new Set() };
+          }
+          userScores[key].total += result.score;
+          userScores[key].count += 1;
+          userScores[key].domains.add(getDomainFromRole(result.internship_title));
+        });
+
+        // Create leaderboard entries
+        let entries: LeaderboardEntry[] = [];
+        Object.entries(userScores).forEach(([key, data], index) => {
+          const avgScore = Math.round(data.total / data.count);
+          const primaryDomain = Array.from(data.domains)[0] || 'General';
+          
+          entries.push({
+            rank: 0, // Will be sorted and assigned later
+            name: key.split('-')[0] || 'Anonymous',
+            username: null,
+            score: avgScore,
+            primaryStack: primaryDomain,
+            badge: null,
+            testsCompleted: data.count
+          });
+        });
+
+        // Sort by score descending
+        entries.sort((a, b) => b.score - a.score);
+        
+        // Assign ranks and badges
+        entries = entries.map((entry, index) => ({
+          ...entry,
+          rank: index + 1,
+          badge: getBadgeFromRank(index + 1, entries.length)
+        }));
+
+        setLeaderboard(entries);
+
+        // Calculate user's rank
+        if (currentUser.id) {
+          // Find user's applications and calculate their score
+          const userApplications = applications.filter((app: Application) => app.test_score !== null);
+          const userTotalScore = userApplications.reduce((acc: number, app: Application) => acc + (app.test_score || 0), 0);
+          const userAvgScore = userApplications.length > 0 
+            ? Math.round(userTotalScore / userApplications.length)
+            : 0;
+
+          // Find user's rank
+          const userGlobalRank = entries.findIndex(e => e.score <= userAvgScore) + 1;
+
+          // Calculate domain ranks
+          const domainGroups: { [key: string]: { scores: number[]; names: string[] } } = {};
+          entries.forEach(entry => {
+            if (!domainGroups[entry.primaryStack]) {
+              domainGroups[entry.primaryStack] = { scores: [], names: [] };
+            }
+            domainGroups[entry.primaryStack].scores.push(entry.score);
+          });
+
+          const domainRanks: DomainRank[] = Object.entries(domainGroups).map(([domain, data]) => {
+            const domainScores = data.scores.sort((a, b) => b - a);
+            const userDomainScore = userApplications
+              .filter((app: Application) => getDomainFromRole(app.internship.internship_role) === domain)
+              .reduce((acc: number, app: Application) => acc + (app.test_score || 0), 0);
+            
+            const userDomainRank = domainScores.findIndex(score => score <= userDomainScore) + 1;
+            const percentile = ((userDomainRank / domainScores.length) * 100).toFixed(1);
+            
+            return {
+              domain,
+              rank: userDomainRank || 1,
+              percentile: `Top ${percentile}%`,
+              score: userDomainScore
+            };
+          });
+
+          // Create recent achievements from test results
+          const recentAchievements = testResults
+            .slice(0, 3)
+            .map((result: TestResult) => ({
+              title: `Perfect Score – ${result.internship_title}`,
+              points: `+${result.score}`,
+              date: new Date(result.completed_date).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+              }),
+              internship: result.company_name
+            }));
+
+          setUserRank({
+            globalRank: userGlobalRank || 1,
+            totalScore: userAvgScore,
+            testsCompleted: userApplications.length,
+            domainRanks: domainRanks.slice(0, 3),
+            recentAchievements: recentAchievements.length > 0 ? recentAchievements : [
+              { title: "Complete your first quiz", points: "+0", date: "Not started" }
+            ]
+          });
+        }
+
+      } catch (err) {
+        console.error('Error fetching leaderboard data:', err);
+        setError('Failed to load leaderboard. Please try again.');
+        
+        // Set fallback data for development
+        setLeaderboard([]);
+        setUserRank({
+          globalRank: 1,
+          totalScore: 0,
+          testsCompleted: 0,
+          domainRanks: [
+            { domain: "Frontend Development", rank: 1, percentile: "Top 1%", score: 0 },
+            { domain: "Python", rank: 1, percentile: "Top 1%", score: 0 },
+          ],
+          recentAchievements: [
+            { title: "Complete your first quiz", points: "+0", date: "Not started" }
+          ]
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboardData();
+  }, []);
+
+  // Apply filters and search
   const filteredLeaderboard = leaderboard.filter(item =>
-    item.primaryStack.toLowerCase().includes(filter === 'all' ? '' : filter.toLowerCase()) &&
+    (filter === 'all' ? true : item.primaryStack.toLowerCase().includes(filter.toLowerCase())) &&
     (item.name?.toLowerCase().includes(search.toLowerCase()) ||
      (item.username?.toLowerCase().includes(search.toLowerCase()) ?? false))
   );
@@ -97,6 +327,27 @@ const SkillLeaderboard = () => {
           <div className="text-center">
             <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
             <p className="text-slate-600 text-lg">Loading leaderboard...</p>
+            <p className="text-sm text-slate-400 mt-2">Gathering top performers</p>
+          </div>
+        </div>
+      </CandidateDashboardSkeleton>
+    );
+  }
+
+  if (error) {
+    return (
+      <CandidateDashboardSkeleton>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/40 flex items-center justify-center">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <p className="text-slate-800 text-lg font-semibold mb-2">Error loading leaderboard</p>
+            <p className="text-slate-500 text-sm mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </CandidateDashboardSkeleton>
@@ -105,7 +356,9 @@ const SkillLeaderboard = () => {
 
   const totalParticipants = leaderboard.length;
   const topScore = leaderboard[0]?.score || 0;
-  const averageScore = Math.round(leaderboard.reduce((acc, curr) => acc + curr.score, 0) / totalParticipants);
+  const averageScore = totalParticipants > 0
+    ? Math.round(leaderboard.reduce((acc, curr) => acc + curr.score, 0) / totalParticipants)
+    : 0;
 
   return (
     <CandidateDashboardSkeleton>
@@ -140,7 +393,7 @@ const SkillLeaderboard = () => {
 
                 <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
                   <p className="text-slate-300 text-sm">Your Rank</p>
-                  <h3 className="text-3xl font-bold mt-2">#{userRank?.globalRank}</h3>
+                  <h3 className="text-3xl font-bold mt-2">#{userRank?.globalRank || '-'}</h3>
                 </div>
 
                 <div className="rounded-3xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
@@ -171,7 +424,9 @@ const SkillLeaderboard = () => {
                       <div>
                         <p className="text-sm text-blue-100">Your Global Ranking</p>
                         <p className="text-4xl font-bold">#{userRank.globalRank}</p>
-                        <p className="text-sm text-blue-100 mt-1">Total Score: {userRank.totalScore}</p>
+                        <p className="text-sm text-blue-100 mt-1">
+                          Total Score: {userRank.totalScore} • Tests: {userRank.testsCompleted}
+                        </p>
                       </div>
                     </div>
 
@@ -221,7 +476,7 @@ const SkillLeaderboard = () => {
                     <option value="python">Python</option>
                     <option value="fullstack">Full Stack</option>
                     <option value="backend">Backend</option>
-                    <option value="datascience">Data Science</option>
+                    <option value="data science">Data Science</option>
                     <option value="ui/ux">UI/UX</option>
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none w-4 h-4" />
@@ -252,6 +507,7 @@ const SkillLeaderboard = () => {
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Primary Stack</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Score</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Tests</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Badge</th>
                   </tr>
                 </thead>
@@ -260,7 +516,7 @@ const SkillLeaderboard = () => {
                     <tr 
                       key={entry.rank} 
                       className={`hover:bg-slate-50 transition-colors ${
-                        entry.username === 'tharindu_dev' ? 'bg-blue-50/50' : ''
+                        entry.userId === currentUserId ? 'bg-blue-50/50' : ''
                       }`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -298,6 +554,9 @@ const SkillLeaderboard = () => {
                         <span className="text-lg font-bold text-slate-900">{entry.score}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-slate-600">{entry.testsCompleted || 1}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         {entry.badge && (
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
                             entry.badge.includes('Top') ? 'bg-yellow-100 text-yellow-700' :
@@ -330,7 +589,7 @@ const SkillLeaderboard = () => {
           </div>
 
           {/* Recent Achievements */}
-          {userRank?.recentAchievements?.length > 0 && (
+          {userRank?.recentAchievements && userRank.recentAchievements.length > 0 && (
             <div className="rounded-[32px] border border-slate-200/60 bg-white/95 backdrop-blur-xl shadow-[0_10px_40px_rgba(15,23,42,0.08)] overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/70">
                 <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -354,6 +613,9 @@ const SkillLeaderboard = () => {
                               <Clock size={12} />
                               {ach.date}
                             </p>
+                            {ach.internship && (
+                              <p className="text-xs text-slate-400 mt-1">{ach.internship}</p>
+                            )}
                           </div>
                         </div>
                         <span className="text-green-600 font-bold text-lg">{ach.points}</span>
@@ -370,7 +632,7 @@ const SkillLeaderboard = () => {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <TrendingUp size={16} />
-                Leaderboard updates every 24 hours
+                Leaderboard updates in real-time as you complete quizzes
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
