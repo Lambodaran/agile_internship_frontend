@@ -88,13 +88,9 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
       const token = localStorage.getItem('access_token');
       if (!token) return;
 
-      if (user.role === 'candidate') {
-        setNotifications([]);
-        setUnreadCount(0);
-        return;
-      }
+      const scope = user.role === 'candidate' ? 'candidate' : 'interviewer';
 
-      const response = await axios.get(`${baseApi}/notifications/interviewer/notifications/`, {
+      const response = await axios.get(`${baseApi}/notifications/${scope}/notifications/`, {
         headers: {
           Authorization: `Token ${token}`,
         },
@@ -126,8 +122,9 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
       const token = localStorage.getItem('access_token');
       if (!token) return;
 
+      const scope = user.role === 'candidate' ? 'candidate' : 'interviewer';
       await axios.patch(
-        `${baseApi}/notifications/interviewer/notifications/${notificationId}/read/`,
+        `${baseApi}/notifications/${scope}/notifications/${notificationId}/read/`,
         {},
         {
           headers: {
@@ -154,10 +151,11 @@ const Header: React.FC<HeaderProps> = ({ isSidebarOpen, setSidebarOpen, onLogout
   const markAllNotificationsAsRead = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      if (!token || user.role === 'candidate') return;
+      if (!token) return;
+      const scope = user.role === 'candidate' ? 'candidate' : 'interviewer';
 
       await axios.patch(
-        `${baseApi}/notifications/interviewer/notifications/mark-all-read/`,
+        `${baseApi}/notifications/${scope}/notifications/mark-all-read/`,
         {},
         {
           headers: {
