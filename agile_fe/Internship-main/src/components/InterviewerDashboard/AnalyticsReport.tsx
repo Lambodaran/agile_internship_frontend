@@ -335,6 +335,12 @@ const AnalyticsReport: React.FC = () => {
 
   const handleExport = async (format: 'pdf' | 'csv') => {
     try {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        alert("Please login again to export reports.");
+        return;
+      }
+
       if (format === 'csv') {
         // Simple CSV export
         const headers = ['Metric', 'Value'];
@@ -361,7 +367,24 @@ const AnalyticsReport: React.FC = () => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       } else {
-        alert('PDF export - Implement with your preferred PDF library');
+        const response = await api.get('/interviewer/analytics/download-pdf/', {
+          headers: { Authorization: `Token ${token}` },
+          params: {
+            date_range: dateRange,
+            selected_role: selectedRole,
+          },
+          responseType: 'blob',
+        });
+
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `interviewer-analytics-${dateRange}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
       }
     } catch (err) {
       console.error('Export failed:', err);
