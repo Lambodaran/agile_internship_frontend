@@ -1,15 +1,19 @@
-// src/pages/candidate/ApplicationHistory.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Briefcase,
-  CheckCircle,
-  Clock,
+  CheckCircle2,
+  Clock3,
   XCircle,
   ChevronDown,
   ChevronRight,
   Building2,
+  Search,
+  Sparkles,
+  Layers3,
+  Trophy,
+  CircleDashed,
+  CalendarDays,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import CandidateDashboardSkeleton from '../../components/skeleton/CandidateDashboardSkeleton';
 
 const baseApi = import.meta.env.VITE_BASE_API;
@@ -46,27 +50,11 @@ interface Application {
   feedback?: string | null;
 }
 
-type StepDefinition = {
-  key: TimelineEvent['eventType'];
-  title: string;
-};
-
-const DEFAULT_STEPS: StepDefinition[] = [
-  { key: 'applied', title: 'Application Submitted' },
-  { key: 'application_accepted', title: 'Application Accepted' },
-  { key: 'quiz_completed', title: 'Quiz Completed' },
-  { key: 'shortlisted', title: 'Shortlisted for Interview' },
-  { key: 'interview_scheduled', title: 'Interview Scheduled' },
-  { key: 'interview_completed', title: 'Face-to-Face Interview' },
-  { key: 'offer_extended', title: 'Selected for Internship' },
-];
-
-const ApplicationHistory = () => {
-  const navigate = useNavigate();
-
+const ApplicationHistory: React.FC = () => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -108,29 +96,12 @@ const ApplicationHistory = () => {
     fetchApplicationHistory();
   }, []);
 
-  const filteredApps = applications.filter(
-    (app) =>
-      filterStatus === 'all' ||
-      (filterStatus === 'accepted' && app.finalOutcome === 'accepted') ||
-      (filterStatus === 'rejected' && app.finalOutcome === 'rejected') ||
-      (filterStatus === 'withdrawn' && app.finalOutcome === 'withdrawn') ||
-      (!app.finalOutcome && filterStatus === 'active')
-  );
-
   const toggleExpand = (appId: string) => {
-    setExpandedApp(expandedApp === appId ? null : appId);
-  };
-
-  const getStatusColor = (outcome?: string | null) => {
-    if (!outcome) return 'text-blue-600';
-    if (outcome === 'accepted') return 'text-green-600';
-    if (outcome === 'rejected') return 'text-red-600';
-    if (outcome === 'withdrawn') return 'text-orange-600';
-    return 'text-gray-600';
+    setExpandedApp((prev) => (prev === appId ? null : appId));
   };
 
   const formatDateTime = (value?: string | null) => {
-    if (!value) return 'Pending';
+    if (!value) return 'Waiting for this stage';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
     return date.toLocaleString('en-US', {
@@ -154,70 +125,76 @@ const ApplicationHistory = () => {
     });
   };
 
-  const buildFullTimeline = (app: Application): TimelineEvent[] => {
-    const actualMap = new Map(app.timeline.map((event) => [event.eventType, event]));
-    const hasRejectedEvent = app.timeline.some((event) => event.eventType === 'rejected');
-
-    let failedStepKey: TimelineEvent['eventType'] | null = null;
-
-    if (hasRejectedEvent) {
-      const hasSelected = app.timeline.some((event) => event.eventType === 'offer_extended');
-      const hasInterviewCompleted = app.timeline.some(
-        (event) => event.eventType === 'interview_completed'
-      );
-      const hasInterviewScheduled = app.timeline.some(
-        (event) => event.eventType === 'interview_scheduled'
-      );
-      const hasShortlisted = app.timeline.some((event) => event.eventType === 'shortlisted');
-      const hasQuizCompleted = app.timeline.some((event) => event.eventType === 'quiz_completed');
-      const hasApplicationAccepted = app.timeline.some(
-        (event) => event.eventType === 'application_accepted'
-      );
-
-      if (hasSelected) {
-        failedStepKey = null;
-      } else if (hasInterviewCompleted || hasInterviewScheduled) {
-        failedStepKey = 'offer_extended';
-      } else if (hasShortlisted || hasQuizCompleted) {
-        failedStepKey = 'shortlisted';
-      } else if (hasApplicationAccepted) {
-        failedStepKey = 'quiz_completed';
-      } else {
-        failedStepKey = 'application_accepted';
-      }
-    }
-
-    return DEFAULT_STEPS.map((step) => {
-      const existing = actualMap.get(step.key);
-
-      if (existing) {
-        return {
-          ...existing,
-          title: existing.title || step.title,
-        };
-      }
-
-      if (failedStepKey === step.key) {
-        return {
-          id: `${app.id}-${step.key}-failed`,
-          eventType: step.key,
-          title: step.title,
-          description: 'This stage was not successfully completed.',
-          timestamp: '',
-          status: 'failed',
-        };
-      }
-
-      return {
-        id: `${app.id}-${step.key}-pending`,
-        eventType: step.key,
-        title: step.title,
-        description: 'This step has not been reached yet.',
-        timestamp: '',
-        status: 'pending',
-      };
-    });
+  const statusPillClass = (outcome?: string | null) => {
+    if (!outcome) return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (outcome === 'accepted') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (outcome === 'rejected') return 'bg-red-50 text-red-700 border-red-200';
+    if (outcome === 'withdrawn') return 'bg-amber-50 text-amber-700 border-amber-200';
+    return 'bg-slate-50 text-slate-700 border-slate-200';
   };
+
+  const timelineBadgeClass = (status: TimelineEvent['status']) => {
+    if (status === 'completed') return 'bg-emerald-100 text-emerald-700';
+    if (status === 'failed') return 'bg-red-100 text-red-700';
+    return 'bg-slate-100 text-slate-600';
+  };
+
+  const timelineCardClass = (status: TimelineEvent['status']) => {
+    if (status === 'completed') return 'border-emerald-100 bg-emerald-50';
+    if (status === 'failed') return 'border-red-100 bg-red-50';
+    return 'border-slate-200 bg-white';
+  };
+
+  const timelineDotClass = (status: TimelineEvent['status']) => {
+    if (status === 'completed') return 'bg-emerald-100 border-emerald-500';
+    if (status === 'failed') return 'bg-red-100 border-red-500';
+    return 'bg-slate-100 border-slate-400';
+  };
+
+  const getTimelineIcon = (status: TimelineEvent['status']) => {
+    if (status === 'completed') {
+      return <CheckCircle2 size={16} className="text-emerald-600" />;
+    }
+    if (status === 'failed') {
+      return <XCircle size={16} className="text-red-600" />;
+    }
+    return <Clock3 size={16} className="text-slate-500" />;
+  };
+
+  const filteredApps = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
+    return applications.filter((app) => {
+      const matchesFilter =
+        filterStatus === 'all' ||
+        (filterStatus === 'accepted' && app.finalOutcome === 'accepted') ||
+        (filterStatus === 'rejected' && app.finalOutcome === 'rejected') ||
+        (filterStatus === 'withdrawn' && app.finalOutcome === 'withdrawn') ||
+        (!app.finalOutcome && filterStatus === 'active');
+
+      const searchable = [
+        app.company,
+        app.role,
+        app.currentStatus,
+        app.finalOutcome || '',
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      const matchesSearch = !query || searchable.includes(query);
+
+      return matchesFilter && matchesSearch;
+    });
+  }, [applications, filterStatus, searchTerm]);
+
+  const summary = useMemo(() => {
+    return {
+      total: filteredApps.length,
+      active: filteredApps.filter((app) => !app.finalOutcome).length,
+      accepted: filteredApps.filter((app) => app.finalOutcome === 'accepted').length,
+      rejected: filteredApps.filter((app) => app.finalOutcome === 'rejected').length,
+    };
+  }, [filteredApps]);
 
   if (loading) {
     return (
@@ -232,145 +209,197 @@ const ApplicationHistory = () => {
 
   return (
     <CandidateDashboardSkeleton>
-      <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
-        <div className="max-w-6xl mx-auto space-y-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Application History</h1>
-              <p className="text-gray-600 mt-1">
-                Track every step of your internship applications
-              </p>
-            </div>
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.08),_transparent_30%),linear-gradient(to_bottom_right,_#f8fafc,_#ffffff,_#eff6ff)]">
+        <div className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 py-4 sm:py-6 space-y-6">
+          <div className="relative overflow-hidden rounded-[34px] bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 p-6 sm:p-8 text-white shadow-2xl border border-white/10">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.16),transparent_32%)]" />
+            <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="max-w-2xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-sm text-slate-200">
+                  <Sparkles className="w-4 h-4" />
+                  My Internship Journey
+                </div>
 
-            <div className="flex items-center gap-3">
-              <label className="text-sm text-gray-600">Filter by:</label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                aria-label="Filter applications by status"
-                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none bg-white"
-              >
-                <option value="all">All Applications</option>
-                <option value="active">Active</option>
-                <option value="accepted">Accepted</option>
-                <option value="rejected">Rejected</option>
-              </select>
+                <h1 className="mt-4 text-2xl sm:text-3xl lg:text-4xl font-bold">
+                  Application History
+                </h1>
+
+                <p className="mt-3 text-slate-300 text-sm sm:text-base leading-relaxed">
+                  Track every application, quiz result, interview stage, and final outcome in one place.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 min-w-full lg:min-w-[420px]">
+                <div className="rounded-3xl bg-white/10 border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Applications</p>
+                  <h3 className="text-3xl font-bold mt-2">{summary.total}</h3>
+                </div>
+                <div className="rounded-3xl bg-white/10 border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Active</p>
+                  <h3 className="text-3xl font-bold mt-2">{summary.active}</h3>
+                </div>
+                <div className="rounded-3xl bg-white/10 border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Accepted</p>
+                  <h3 className="text-3xl font-bold mt-2">{summary.accepted}</h3>
+                </div>
+                <div className="rounded-3xl bg-white/10 border border-white/10 p-4">
+                  <p className="text-slate-300 text-sm">Rejected</p>
+                  <h3 className="text-3xl font-bold mt-2">{summary.rejected}</h3>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-5">
-            {filteredApps.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-sm p-12 text-center text-gray-500 border border-gray-200">
-                <Briefcase size={48} className="mx-auto mb-4 opacity-40" />
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">
-                  No applications found
-                </h2>
-                <p>Start applying to internships to see your history here.</p>
+          <div className="rounded-[30px] border border-slate-200/70 bg-white p-5 sm:p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Layers3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">Find your application</h2>
+                  <p className="text-sm text-slate-500">Search and filter your applications</p>
+                </div>
               </div>
-            ) : (
-              filteredApps.map((app) => {
-                const fullTimeline = buildFullTimeline(app);
+
+              <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
+                <div className="relative w-full sm:w-[320px]">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Search role, company, status..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pl-11 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
+                  />
+                </div>
+
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  aria-label="Filter applications by status"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
+                >
+                  <option value="all">All Applications</option>
+                  <option value="active">Active</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="withdrawn">Withdrawn</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {filteredApps.length === 0 ? (
+            <div className="rounded-[30px] border border-slate-200/70 bg-white p-12 text-center shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-slate-100 mb-5">
+                <Briefcase className="w-10 h-10 text-slate-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-slate-900 mb-2">No applications found</h3>
+              <p className="text-sm text-slate-500">
+                Try another search or filter, or start applying to internships.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {filteredApps.map((app, index) => {
+                const appInitial = app.company?.charAt(0)?.toUpperCase() || 'A';
 
                 return (
                   <div
                     key={app.id}
-                    className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"
+                    className="rounded-[30px] border border-slate-200/70 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)] overflow-hidden"
                   >
                     <div
                       onClick={() => toggleExpand(app.id)}
-                      className="px-6 py-5 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
+                      className="cursor-pointer px-5 sm:px-6 py-5 hover:bg-slate-50 transition-colors"
                     >
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
-                          {app.company?.charAt(0)?.toUpperCase() || 'A'}
-                        </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-4 min-w-0 flex-1">
+                          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shrink-0 shadow-md">
+                            {appInitial}
+                          </div>
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <div>
-                              <h3 className="font-semibold text-gray-900 truncate">{app.role}</h3>
-                              <p className="text-sm text-gray-600 flex items-center gap-1">
-                                <Building2 size={14} />
-                                {app.company}
-                              </p>
-                            </div>
-                            <div className={`text-sm font-medium ${getStatusColor(app.finalOutcome)}`}>
-                              {app.currentStatus}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
+                              <div className="min-w-0">
+                                <h3 className="text-lg font-bold text-slate-900 truncate">
+                                  {app.role}
+                                </h3>
+
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700 border border-slate-200">
+                                    <Building2 size={14} />
+                                    {app.company}
+                                  </span>
+
+                                  <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600 border border-slate-200">
+                                    <CalendarDays size={14} />
+                                    Applied on {formatDateOnly(app.appliedAt)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <span
+                                className={`inline-flex items-center w-fit rounded-full border px-3 py-1 text-xs font-semibold ${statusPillClass(
+                                  app.finalOutcome
+                                )}`}
+                              >
+                                {app.currentStatus}
+                              </span>
                             </div>
                           </div>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Applied on {formatDateOnly(app.appliedAt)}
-                          </p>
                         </div>
-                      </div>
 
-                      <div className="ml-4">
-                        {expandedApp === app.id ? (
-                          <ChevronDown size={20} className="text-gray-500" />
-                        ) : (
-                          <ChevronRight size={20} className="text-gray-500" />
-                        )}
+                        <div className="shrink-0 mt-1">
+                          {expandedApp === app.id ? (
+                            <ChevronDown size={22} className="text-slate-500" />
+                          ) : (
+                            <ChevronRight size={22} className="text-slate-500" />
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     {expandedApp === app.id && (
-                      <div className="px-6 pb-6 border-t bg-gray-50">
-                        <div className="relative mt-6 ml-2 sm:ml-6">
-                          <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
+                      <div className="border-t border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 sm:px-6 py-5">
+                        <div className="relative ml-1 sm:ml-4">
+                          <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-200" />
 
-                          <div className="space-y-8">
-                            {fullTimeline.map((event, index) => (
+                          <div className="space-y-7">
+                            {app.timeline.map((event, stepIndex) => (
                               <div key={event.id} className="relative flex items-start">
                                 <div
-                                  className={`absolute left-0 w-8 h-8 rounded-full flex items-center justify-center z-10 border-2 ${
-                                    event.status === 'completed'
-                                      ? 'bg-green-100 border-green-500'
-                                      : event.status === 'failed'
-                                      ? 'bg-red-100 border-red-500'
-                                      : 'bg-gray-100 border-gray-400'
-                                  }`}
+                                  className={`absolute left-0 w-8 h-8 rounded-full flex items-center justify-center z-10 border-2 shadow-sm ${timelineDotClass(
+                                    event.status
+                                  )}`}
                                 >
-                                  {event.status === 'completed' ? (
-                                    <CheckCircle size={16} className="text-green-600" />
-                                  ) : event.status === 'failed' ? (
-                                    <XCircle size={16} className="text-red-600" />
-                                  ) : (
-                                    <Clock size={16} className="text-gray-500" />
-                                  )}
+                                  {getTimelineIcon(event.status)}
                                 </div>
 
                                 <div className="ml-12 w-full">
                                   <div
-                                    className={`rounded-xl border px-4 py-3 ${
-                                      event.status === 'completed'
-                                        ? 'bg-green-50 border-green-100'
-                                        : event.status === 'failed'
-                                        ? 'bg-red-50 border-red-100'
-                                        : 'bg-white border-gray-200'
-                                    }`}
+                                    className={`rounded-2xl border px-4 py-4 ${timelineCardClass(
+                                      event.status
+                                    )}`}
                                   >
-                                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                                      <div>
-                                        <h4 className="font-medium text-gray-900">
-                                          {index + 1}. {event.title}
+                                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <h4 className="font-semibold text-slate-900">
+                                          {stepIndex + 1}. {event.title}
                                         </h4>
 
                                         {event.description && (
-                                          <p className="text-sm text-gray-600 mt-0.5">
+                                          <p className="text-sm text-slate-600 mt-1">
                                             {event.description}
                                           </p>
                                         )}
-
                                       </div>
 
                                       <span
-                                        className={`inline-flex w-fit px-2.5 py-1 rounded-full text-xs font-medium ${
-                                          event.status === 'completed'
-                                            ? 'bg-green-100 text-green-700'
-                                            : event.status === 'failed'
-                                            ? 'bg-red-100 text-red-700'
-                                            : 'bg-gray-100 text-gray-600'
-                                        }`}
+                                        className={`inline-flex w-fit px-2.5 py-1 rounded-full text-xs font-semibold ${timelineBadgeClass(
+                                          event.status
+                                        )}`}
                                       >
                                         {event.status === 'completed'
                                           ? 'Completed'
@@ -380,22 +409,22 @@ const ApplicationHistory = () => {
                                       </span>
                                     </div>
 
-                                    <p className="text-xs text-gray-500 mt-2">
+                                    <p className="text-xs text-slate-500 mt-3">
                                       {event.status === 'pending'
                                         ? 'Waiting for this stage'
+                                        : event.status === 'failed'
+                                        ? 'This stage was not completed successfully'
                                         : formatDateTime(event.timestamp)}
                                     </p>
 
-                                    {event.status === 'failed' &&
-                                      app.feedback &&
-                                      index === fullTimeline.length - 1 && (
-                                        <div className="mt-3 p-4 bg-red-50 border border-red-100 rounded-lg">
-                                          <p className="text-sm font-medium text-red-800 mb-1">
-                                            Feedback from recruiter:
-                                          </p>
-                                          <p className="text-sm text-gray-700">{app.feedback}</p>
-                                        </div>
-                                      )}
+                                    {event.status === 'failed' && app.feedback && (
+                                      <div className="mt-4 rounded-xl border border-red-100 bg-red-50 p-4">
+                                        <p className="text-sm font-semibold text-red-800 mb-1">
+                                          Feedback from recruiter
+                                        </p>
+                                        <p className="text-sm text-slate-700">{app.feedback}</p>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -406,9 +435,9 @@ const ApplicationHistory = () => {
                     )}
                   </div>
                 );
-              })
-            )}
-          </div>
+              })}
+            </div>
+          )}
         </div>
       </div>
     </CandidateDashboardSkeleton>

@@ -418,13 +418,17 @@ const InterviewerSelectedCandidate: React.FC = () => {
               </div>
             ) : (
               <>
-                <div className="block lg:hidden divide-y divide-slate-100">
+                <div className="block lg:hidden bg-slate-50/70 p-3 sm:p-4">
+  <div className="space-y-4">
                   {filteredCandidates.map((c) => {
                     const isSaving = savingIds.has(c.id);
                     const selectionEditable = c.attended_meeting === true;
 
                     return (
-                      <div key={c.id} className="p-4 sm:p-5 space-y-4">
+                      <div
+  key={c.id}
+  className="rounded-[28px] border border-slate-200 bg-white shadow-sm p-4 sm:p-5 space-y-4"
+>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="h-11 w-11 rounded-2xl bg-blue-100 flex items-center justify-center shrink-0">
@@ -547,7 +551,7 @@ const InterviewerSelectedCandidate: React.FC = () => {
                     );
                   })}
                 </div>
-
+              </div>
                 <div className="hidden lg:block overflow-x-auto">
                   <table className="min-w-full">
                     <thead className="bg-slate-50 border-b border-slate-200">
